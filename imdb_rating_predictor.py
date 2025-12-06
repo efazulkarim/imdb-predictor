@@ -1,4 +1,4 @@
- IMDb RATING PREDICTOR - OPTIMIZED FOR MOVIE SCRIPTS
+# IMDb RATING PREDICTOR - OPTIMIZED FOR MOVIE SCRIPTS
 # Version: 2.0 (Production Ready)
 # Dataset: 5000 Movie Scripts + Excel Metadata
 # Split: 70% Training / 30% Testing
