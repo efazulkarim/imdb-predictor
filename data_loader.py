@@ -20,14 +20,80 @@ from preprocessing import ScriptPreprocessor
 
 
 def load_dataset():
-    """Load Excel and script files, extract all features."""
+    """Load Excel and script files, extract all features.
+    
+    Supports loading from multiple Excel files. If EXCEL_FILES is defined
+    and contains file paths, it will load from all of them. Otherwise,
+    it falls back to EXCEL_FILE. Duplicate scripts (same filename) are
+    automatically handled - only the first occurrence is processed.
+    """
     print("=" * 70)
     print("  LOADING DATASET")
     print("=" * 70)
 
-    # Load Excel
-    df = pd.read_excel(EXCEL_FILE)
-    print(f"\n📊 Excel loaded: {len(df)} records")
+    # Determine which Excel files to load
+    excel_files_to_load = []
+    
+    # Check if EXCEL_FILES is defined and has content
+    try:
+        # Get EXCEL_FILES safely (may not be defined)
+        import config
+        EXCEL_FILES = getattr(config, 'EXCEL_FILES', None)
+        
+        # Normalize EXCEL_FILES to always be a list
+        if EXCEL_FILES:
+            if isinstance(EXCEL_FILES, str):
+                # If it's a string, convert to list
+                excel_files_to_load = [EXCEL_FILES]
+            elif isinstance(EXCEL_FILES, list) and len(EXCEL_FILES) > 0:
+                # If it's a non-empty list, use it
+                excel_files_to_load = EXCEL_FILES
+            else:
+                # Empty list or other type, fall back to single file
+                excel_files_to_load = [EXCEL_FILE]
+        else:
+            # EXCEL_FILES is None/False, fall back to single file
+            excel_files_to_load = [EXCEL_FILE]
+        
+        if len(excel_files_to_load) > 1:
+            print(f"\n📊 Loading from {len(excel_files_to_load)} Excel file(s):")
+        else:
+            print(f"\n📊 Loading from single Excel file:")
+    except Exception:
+        # Any error, fall back to single file
+        excel_files_to_load = [EXCEL_FILE]
+        print(f"\n📊 Loading from single Excel file:")
+
+    # Load and combine Excel files
+    dataframes = []
+    for excel_file in excel_files_to_load:
+        if not os.path.exists(excel_file):
+            print(f"   ⚠️  Warning: File not found: {excel_file}")
+            continue
+        
+        try:
+            df_temp = pd.read_excel(excel_file)
+            print(f"   ✅ {excel_file}: {len(df_temp)} records")
+            dataframes.append(df_temp)
+        except Exception as e:
+            print(f"   ❌ Error loading {excel_file}: {e}")
+            continue
+
+    if not dataframes:
+        raise FileNotFoundError("No valid Excel files found to load!")
+
+    # Combine all dataframes
+    df = pd.concat(dataframes, ignore_index=True)
+    
+    # Remove duplicates based on script filename (keep first occurrence)
+    initial_count = len(df)
+    df = df.drop_duplicates(subset=[SCRIPT_COL], keep='first')
+    duplicates_removed = initial_count - len(df)
+    
+    if duplicates_removed > 0:
+        print(f"   📝 Removed {duplicates_removed} duplicate script entries")
+    
+    print(f"\n📊 Combined dataset: {len(df)} unique records")
     print(f"   Columns: {list(df.columns)}")
     print(f"   Note: Scripts not found will be skipped automatically")
 
