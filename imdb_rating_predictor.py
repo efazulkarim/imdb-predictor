@@ -147,6 +147,7 @@ def load_dataset():
     df = pd.read_excel(EXCEL_FILE)
     print(f"\n📊 Excel loaded: {len(df)} records")
     print(f"   Columns: {list(df.columns)}")
+    print(f"   Note: Scripts not found will be skipped automatically")
 
     # Data containers
     scripts_text = []
