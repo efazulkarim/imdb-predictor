@@ -5,6 +5,7 @@
 # ============================================================
 
 import os
+import sys
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -73,6 +74,17 @@ def main():
     # Load data
     scripts_text, ratings, features_df, movie_names, decade_encoder = load_dataset()
 
+    # Show data loading summary
+    print(f"\n✅ Data Loading Complete!")
+    print(f"   Successfully loaded: {len(scripts_text)} scripts")
+    print(f"   Rating range: {ratings.min():.2f} - {ratings.max():.2f}")
+    print(f"   Mean rating: {ratings.mean():.2f}")
+
+    # Check if user wants to skip training (just test data loading)
+    if len(sys.argv) > 1 and sys.argv[1].lower() in ['--test', '--data-only', '-t']:
+        print("\n✅ Data loading test complete! (Training skipped)")
+        return
+
     if len(scripts_text) < 100:
         print("\n⚠️  WARNING: Less than 100 scripts loaded!")
         print("   Results may be unreliable. Check file paths.")
@@ -112,4 +124,17 @@ def main():
 
 
 if __name__ == "__main__":
+    # Check command line arguments
+    if len(sys.argv) > 1 and sys.argv[1].lower() in ['--help', '-h', '/?']:
+        print("""
+IMDb Rating Predictor - Usage:
+
+  python imdb_rating_predictor.py          # Full pipeline: Load data + Train model
+  python imdb_rating_predictor.py --test    # Test data loading only (skip training)
+  python imdb_rating_predictor.py --help    # Show this help message
+
+Or simply double-click: run.bat (Windows)
+""")
+        sys.exit(0)
+    
     main()
