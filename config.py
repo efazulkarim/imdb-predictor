@@ -16,8 +16,7 @@ EXCEL_FILE = 'isteaq ulab info.xlsx'
 #   EXCEL_FILES = []                             # Empty list (will use EXCEL_FILE instead)
 EXCEL_FILES = [
     'isteaq ulab info.xlsx',
-    # Add your second Excel file here, e.g.:
-    # 'second_file.xlsx',
+    'movie_scripts_nadim_info_sheet.xlsx',
 ]
 
 # If EXCEL_FILES is empty or not set, it will use EXCEL_FILE
