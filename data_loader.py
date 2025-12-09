@@ -73,7 +73,45 @@ def load_dataset():
         
         try:
             df_temp = pd.read_excel(excel_file)
-            print(f"   ✅ {excel_file}: {len(df_temp)} records")
+            
+            # Normalize column names BEFORE combining
+            # This ensures columns with same name (but different whitespace) are treated as the same
+            column_renames = {}
+            
+            # 1. Normalize all whitespace (leading, trailing, and normalize internal spaces)
+            for col in df_temp.columns:
+                col_normalized = ' '.join(col.split())  # Normalize all whitespace to single spaces and strip
+                if col != col_normalized:
+                    column_renames[col] = col_normalized
+            
+            # Apply whitespace normalization first
+            if column_renames:
+                df_temp = df_temp.rename(columns=column_renames)
+                column_renames = {}  # Reset for next step
+            
+            # 2. Fix typos/variations (after whitespace normalization)
+            if 'Decaade' in df_temp.columns:
+                column_renames['Decaade'] = 'Decade'
+            
+            # Apply typo fixes
+            if column_renames:
+                df_temp = df_temp.rename(columns=column_renames)
+            
+            # Final strip to ensure no trailing/leading spaces remain
+            df_temp.columns = df_temp.columns.str.strip()
+            
+            # Show rating range for this file
+            if RATING_COL in df_temp.columns:
+                valid_ratings = pd.to_numeric(df_temp[RATING_COL], errors='coerce').dropna()
+                if len(valid_ratings) > 0:
+                    min_rating = valid_ratings.min()
+                    max_rating = valid_ratings.max()
+                    print(f"   ✅ {excel_file}: {len(df_temp)} records (Ratings: {min_rating:.1f}-{max_rating:.1f})")
+                else:
+                    print(f"   ✅ {excel_file}: {len(df_temp)} records (no valid ratings)")
+            else:
+                print(f"   ✅ {excel_file}: {len(df_temp)} records")
+            
             dataframes.append(df_temp)
         except Exception as e:
             print(f"   ❌ Error loading {excel_file}: {e}")
@@ -83,18 +121,105 @@ def load_dataset():
         raise FileNotFoundError("No valid Excel files found to load!")
 
     # Combine all dataframes
-    df = pd.concat(dataframes, ignore_index=True)
+    # Column names are already normalized in the loading loop above
+    # This should ensure columns with same name (but different whitespace) are treated as the same
+    df = pd.concat(dataframes, ignore_index=True, sort=False)
     
-    # Remove duplicates based on script filename (keep first occurrence)
+    # Final check: ensure no duplicate column names
+    # This should not happen after normalization, but check just in case
+    if len(df.columns) != len(set(df.columns)):
+        # Find and report duplicate column names
+        seen = set()
+        duplicates = []
+        for col in df.columns:
+            if col in seen:
+                duplicates.append(col)
+            else:
+                seen.add(col)
+        
+        if duplicates:
+            print(f"   ⚠️  Warning: Found duplicate column names: {', '.join(duplicates)}")
+            # Drop duplicate columns (keep first occurrence)
+            df = df.loc[:, ~df.columns.duplicated(keep='first')]
+            print(f"   🔧 Removed duplicate columns, keeping first occurrence")
+    
+    # Ensure all expected columns exist (add missing ones with NaN if needed)
+    expected_columns = [
+        MOVIE_NAME_COL,
+        YEAR_COL,
+        RATING_COL,
+        'IMDb ID',  # This might not be in config, so hardcode it
+        SCRIPT_COL,
+        'Collected By',  # This might not be in config, so hardcode it
+        DECADE_COL
+    ]
+    
+    # Add any missing expected columns (fill with NaN)
+    for col in expected_columns:
+        if col not in df.columns:
+            df[col] = None
+            print(f"   ⚠️  Warning: Column '{col}' not found in Excel files, added as empty")
+    
+    # Remove duplicates carefully
+    # Check for duplicates based on Movie Name OR Script filename
     initial_count = len(df)
-    df = df.drop_duplicates(subset=[SCRIPT_COL], keep='first')
-    duplicates_removed = initial_count - len(df)
     
-    if duplicates_removed > 0:
-        print(f"   📝 Removed {duplicates_removed} duplicate script entries")
+    # Check for duplicates by script filename (most reliable - same script = same movie)
+    script_duplicates_before = df.duplicated(subset=[SCRIPT_COL], keep='first').sum()
+    
+    # Check for duplicates by movie name (same movie name might appear in both sheets)
+    movie_duplicates_before = df.duplicated(subset=[MOVIE_NAME_COL], keep='first').sum()
+    
+    # Remove duplicates: First remove by script filename (most reliable identifier)
+    # This handles cases where the same script file appears in both sheets
+    df = df.drop_duplicates(subset=[SCRIPT_COL], keep='first')
+    
+    # Then remove by movie name (handles cases where same movie has different script files)
+    # This catches any remaining duplicates where movie name matches but script file differs
+    movie_duplicates_after = df.duplicated(subset=[MOVIE_NAME_COL], keep='first').sum()
+    if movie_duplicates_after > 0:
+        df = df.drop_duplicates(subset=[MOVIE_NAME_COL], keep='first')
+    
+    total_duplicates_removed = initial_count - len(df)
+    
+    if total_duplicates_removed > 0:
+        print(f"\n📝 Duplicate Removal Summary:")
+        print(f"   - Removed {script_duplicates_before} duplicate(s) by script filename")
+        if movie_duplicates_after > 0:
+            print(f"   - Removed {movie_duplicates_after} additional duplicate(s) by movie name")
+        print(f"   - Total duplicates removed: {total_duplicates_removed}")
+        print(f"   - Kept first occurrence of each duplicate")
+    else:
+        print(f"\n✅ No duplicates found - all {len(df)} records are unique")
     
     print(f"\n📊 Combined dataset: {len(df)} unique records")
-    print(f"   Columns: {list(df.columns)}")
+    
+    # Display columns in a readable format
+    all_columns = list(df.columns)
+    print(f"   Columns ({len(all_columns)} total): {', '.join(all_columns)}")
+    
+    # Verify expected columns are present
+    expected_columns_check = [
+        MOVIE_NAME_COL,
+        YEAR_COL,
+        RATING_COL,
+        'IMDb ID',
+        SCRIPT_COL,
+        'Collected By',
+        DECADE_COL
+    ]
+    missing_columns = [col for col in expected_columns_check if col not in all_columns]
+    if missing_columns:
+        print(f"   ⚠️  Missing expected columns: {', '.join(missing_columns)}")
+    else:
+        print(f"   ✅ All expected columns present")
+    
+    # Show combined rating range
+    if RATING_COL in df.columns:
+        valid_ratings = pd.to_numeric(df[RATING_COL], errors='coerce').dropna()
+        if len(valid_ratings) > 0:
+            print(f"   Rating range: {valid_ratings.min():.1f} - {valid_ratings.max():.1f} (mean: {valid_ratings.mean():.2f})")
+    
     print(f"   Note: Scripts not found will be skipped automatically")
 
     # Data containers
@@ -137,6 +262,8 @@ def load_dataset():
             os.path.join(SCRIPTS_DIR, script_file.replace(' ', '-') + '.txt'),
             os.path.join(SCRIPTS_DIR, script_file.replace(' ', '-')),
             os.path.join(SCRIPTS_DIR, script_file.replace(' ', '_') + '.txt'),
+            # Handle double extensions (e.g., "file 3000.txt.txt")
+            os.path.join(SCRIPTS_DIR, script_file + '.txt.txt'),
         ]
 
         # Extract number and try more patterns
@@ -147,6 +274,8 @@ def load_dataset():
                 os.path.join(SCRIPTS_DIR, f'file-{num}.txt'),
                 os.path.join(SCRIPTS_DIR, f'file_{num}.txt'),
                 os.path.join(SCRIPTS_DIR, f'file {num}.txt'),
+                os.path.join(SCRIPTS_DIR, f'file {num}.txt.txt'),  # Handle double extension
+                os.path.join(SCRIPTS_DIR, f'file{num}.txt'),  # No space
             ])
 
         # Find existing file
@@ -213,3 +342,18 @@ def load_dataset():
 
     return scripts_text, np.array(ratings), features_df, movie_names, le
 
+
+# ============================================================
+# TEST/MAIN BLOCK (for testing the data loader)
+# ============================================================
+if __name__ == "__main__":
+    print("Testing data loader...")
+    try:
+        scripts_text, ratings, features_df, movie_names, decade_encoder = load_dataset()
+        print(f"\n✅ Successfully loaded {len(scripts_text)} scripts!")
+        print(f"   Rating range: {ratings.min():.2f} - {ratings.max():.2f}")
+        print(f"   Mean rating: {ratings.mean():.2f}")
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
