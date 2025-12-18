@@ -14,7 +14,7 @@ from sklearn.preprocessing import LabelEncoder
 
 from config import (
     EXCEL_FILE, SCRIPTS_DIR, SCRIPT_COL, RATING_COL,
-    YEAR_COL, DECADE_COL, MOVIE_NAME_COL
+    YEAR_COL, DECADE_COL, MOVIE_NAME_COL, MOVIE_LENGTH_COL
 )
 from preprocessing import ScriptPreprocessor
 
@@ -151,7 +151,8 @@ def load_dataset():
         'IMDb ID',  # This might not be in config, so hardcode it
         SCRIPT_COL,
         'Collected By',  # This might not be in config, so hardcode it
-        DECADE_COL
+        DECADE_COL,
+        MOVIE_LENGTH_COL
     ]
     
     # Add any missing expected columns (fill with NaN)
@@ -206,7 +207,8 @@ def load_dataset():
         'IMDb ID',
         SCRIPT_COL,
         'Collected By',
-        DECADE_COL
+        DECADE_COL,
+        MOVIE_LENGTH_COL
     ]
     missing_columns = [col for col in expected_columns_check if col not in all_columns]
     if missing_columns:
@@ -229,6 +231,7 @@ def load_dataset():
     years = []
     decades = []
     movie_names = []
+    movie_lengths = []
 
     # Track loading stats
     loaded = 0
@@ -315,6 +318,14 @@ def load_dataset():
             years.append(int(row[YEAR_COL]) if pd.notna(row.get(YEAR_COL)) else 2000)
             decades.append(str(row.get(DECADE_COL, '2000s')))
             movie_names.append(str(row.get(MOVIE_NAME_COL, f'Movie_{idx}')))
+            # Extract movie length (in minutes), default to None if missing/invalid
+            try:
+                movie_length = float(row.get(MOVIE_LENGTH_COL)) if pd.notna(row.get(MOVIE_LENGTH_COL)) else None
+                if movie_length is not None and movie_length <= 0:
+                    movie_length = None
+            except (ValueError, TypeError):
+                movie_length = None
+            movie_lengths.append(movie_length)
             loaded += 1
 
         except Exception as e:
@@ -335,6 +346,7 @@ def load_dataset():
     # Convert to arrays/dataframes
     features_df = pd.DataFrame(script_features)
     features_df['year'] = years
+    features_df['movie_length'] = movie_lengths
 
     # Encode decades
     le = LabelEncoder()

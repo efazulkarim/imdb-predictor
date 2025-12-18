@@ -15,8 +15,7 @@ EXCEL_FILE = 'isteaq ulab info.xlsx'
 #   EXCEL_FILES = 'single_file.xlsx'             # Single file as string
 #   EXCEL_FILES = []                             # Empty list (will use EXCEL_FILE instead)
 EXCEL_FILES = [
-    'isteaq ulab info.xlsx',
-    'movie_scripts_nadim_info_sheet.xlsx',
+    'movie_lengths.xlsx',
 ]
 
 # If EXCEL_FILES is empty or not set, it will use EXCEL_FILE
@@ -27,7 +26,8 @@ SCRIPT_COL = '.txt Files'
 RATING_COL = 'IMDb Rating'
 YEAR_COL = 'Year'
 DECADE_COL = 'Decade'
-MOVIE_NAME_COL = 'Movie Name'
+MOVIE_NAME_COL = 'Movie name'
+MOVIE_LENGTH_COL = 'Movie length'
 
 # Model training parameters
 TEST_SIZE = 0.30          # 30% test, 70% train
