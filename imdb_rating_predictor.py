@@ -97,11 +97,7 @@ def main():
     print("=" * 70)
     print("""
     # In Python:
-    from predictor import predict_rating, predict_from_text
-
-    # Predict from file
-    rating = predict_rating('new_script.txt')
-    print(f"Predicted: {rating}/10")
+    from predictor import predict_rating; print(f'Predicted Rating: {predict_rating(\"scripts/file10074.txt\")}/10')
 
     # Predict from text
     script = "JOHN: Hello!\\nMARY: Hi there!"
