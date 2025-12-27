@@ -56,19 +56,19 @@ def load_dataset():
             excel_files_to_load = [EXCEL_FILE]
         
         if len(excel_files_to_load) > 1:
-            print(f"\n📊 Loading from {len(excel_files_to_load)} Excel file(s):")
+            print(f"\n>> Loading from {len(excel_files_to_load)} Excel file(s):")
         else:
-            print(f"\n📊 Loading from single Excel file:")
+            print(f"\n>> Loading from single Excel file:")
     except Exception:
         # Any error, fall back to single file
         excel_files_to_load = [EXCEL_FILE]
-        print(f"\n📊 Loading from single Excel file:")
+        print(f"\n>> Loading from single Excel file:")
 
     # Load and combine Excel files
     dataframes = []
     for excel_file in excel_files_to_load:
         if not os.path.exists(excel_file):
-            print(f"   ⚠️  Warning: File not found: {excel_file}")
+            print(f"   [WARNING] File not found: {excel_file}")
             continue
         
         try:
@@ -106,15 +106,15 @@ def load_dataset():
                 if len(valid_ratings) > 0:
                     min_rating = valid_ratings.min()
                     max_rating = valid_ratings.max()
-                    print(f"   ✅ {excel_file}: {len(df_temp)} records (Ratings: {min_rating:.1f}-{max_rating:.1f})")
+                    print(f"   [OK] {excel_file}: {len(df_temp)} records (Ratings: {min_rating:.1f}-{max_rating:.1f})")
                 else:
-                    print(f"   ✅ {excel_file}: {len(df_temp)} records (no valid ratings)")
+                    print(f"   [OK] {excel_file}: {len(df_temp)} records (no valid ratings)")
             else:
-                print(f"   ✅ {excel_file}: {len(df_temp)} records")
+                print(f"   [OK] {excel_file}: {len(df_temp)} records")
             
             dataframes.append(df_temp)
         except Exception as e:
-            print(f"   ❌ Error loading {excel_file}: {e}")
+            print(f"   [ERROR] Error loading {excel_file}: {e}")
             continue
 
     if not dataframes:
@@ -138,10 +138,10 @@ def load_dataset():
                 seen.add(col)
         
         if duplicates:
-            print(f"   ⚠️  Warning: Found duplicate column names: {', '.join(duplicates)}")
+            print(f"   [WARNING] Found duplicate column names: {', '.join(duplicates)}")
             # Drop duplicate columns (keep first occurrence)
             df = df.loc[:, ~df.columns.duplicated(keep='first')]
-            print(f"   🔧 Removed duplicate columns, keeping first occurrence")
+            print(f"   >> Removed duplicate columns, keeping first occurrence")
     
     # Ensure all expected columns exist (add missing ones with NaN if needed)
     expected_columns = [
@@ -159,7 +159,7 @@ def load_dataset():
     for col in expected_columns:
         if col not in df.columns:
             df[col] = None
-            print(f"   ⚠️  Warning: Column '{col}' not found in Excel files, added as empty")
+            print(f"   [WARNING] Column '{col}' not found in Excel files, added as empty")
     
     # Remove duplicates carefully
     # Check for duplicates based on Movie Name OR Script filename
@@ -184,16 +184,16 @@ def load_dataset():
     total_duplicates_removed = initial_count - len(df)
     
     if total_duplicates_removed > 0:
-        print(f"\n📝 Duplicate Removal Summary:")
+        print(f"\n>> Duplicate Removal Summary:")
         print(f"   - Removed {script_duplicates_before} duplicate(s) by script filename")
         if movie_duplicates_after > 0:
             print(f"   - Removed {movie_duplicates_after} additional duplicate(s) by movie name")
         print(f"   - Total duplicates removed: {total_duplicates_removed}")
         print(f"   - Kept first occurrence of each duplicate")
     else:
-        print(f"\n✅ No duplicates found - all {len(df)} records are unique")
+        print(f"\n[OK] No duplicates found - all {len(df)} records are unique")
     
-    print(f"\n📊 Combined dataset: {len(df)} unique records")
+    print(f"\n>> Combined dataset: {len(df)} unique records")
     
     # Display columns in a readable format
     all_columns = list(df.columns)
@@ -212,9 +212,9 @@ def load_dataset():
     ]
     missing_columns = [col for col in expected_columns_check if col not in all_columns]
     if missing_columns:
-        print(f"   ⚠️  Missing expected columns: {', '.join(missing_columns)}")
+        print(f"   [WARNING] Missing expected columns: {', '.join(missing_columns)}")
     else:
-        print(f"   ✅ All expected columns present")
+        print(f"   [OK] All expected columns present")
     
     # Show combined rating range
     if RATING_COL in df.columns:
@@ -227,6 +227,7 @@ def load_dataset():
     # Data containers
     scripts_text = []
     script_features = []
+    script_files = []  # Track script filenames for test set saving
     ratings = []
     years = []
     decades = []
@@ -237,7 +238,7 @@ def load_dataset():
     loaded = 0
     skipped = {'missing': 0, 'short': 0, 'invalid_rating': 0, 'error': 0}
 
-    print(f"\n📁 Loading scripts from: {SCRIPTS_DIR}")
+    print(f"\n>> Loading scripts from: {SCRIPTS_DIR}")
     print("   Processing", end="", flush=True)
 
     for idx, row in df.iterrows():
@@ -314,6 +315,7 @@ def load_dataset():
             # Store data
             scripts_text.append(cleaned_text)
             script_features.append(features)
+            script_files.append(os.path.basename(filepath))  # Save script filename
             ratings.append(rating)
             years.append(int(row[YEAR_COL]) if pd.notna(row.get(YEAR_COL)) else 2000)
             decades.append(str(row.get(DECADE_COL, '2000s')))
@@ -335,9 +337,9 @@ def load_dataset():
     print(" Done!")
 
     # Summary
-    print(f"\n📈 Loading Summary:")
-    print(f"   ✅ Successfully loaded: {loaded} scripts")
-    print(f"   ❌ Skipped: {sum(skipped.values())} total")
+    print(f"\n>> Loading Summary:")
+    print(f"   [OK] Successfully loaded: {loaded} scripts")
+    print(f"   [X] Skipped: {sum(skipped.values())} total")
     print(f"      - Missing files: {skipped['missing']}")
     print(f"      - Too short (<1KB): {skipped['short']}")
     print(f"      - Invalid rating: {skipped['invalid_rating']}")
@@ -352,7 +354,7 @@ def load_dataset():
     le = LabelEncoder()
     features_df['decade_encoded'] = le.fit_transform(decades)
 
-    return scripts_text, np.array(ratings), features_df, movie_names, le
+    return scripts_text, np.array(ratings), features_df, movie_names, script_files, le
 
 
 # ============================================================
@@ -361,11 +363,11 @@ def load_dataset():
 if __name__ == "__main__":
     print("Testing data loader...")
     try:
-        scripts_text, ratings, features_df, movie_names, decade_encoder = load_dataset()
-        print(f"\n✅ Successfully loaded {len(scripts_text)} scripts!")
+        scripts_text, ratings, features_df, movie_names, script_files, decade_encoder = load_dataset()
+        print(f"\n[OK] Successfully loaded {len(scripts_text)} scripts!")
         print(f"   Rating range: {ratings.min():.2f} - {ratings.max():.2f}")
         print(f"   Mean rating: {ratings.mean():.2f}")
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()

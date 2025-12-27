@@ -14,13 +14,23 @@ from scipy.sparse import hstack, csr_matrix
 from preprocessing import ScriptPreprocessor
 
 
-def predict_rating(script_path, model_path='imdb_model.pkl'):
+def predict_rating(script_path, model_path='imdb_model.pkl', year=None, decade_encoded=None, movie_length=None):
     """
     Predict IMDb rating for a new script file.
+
+    Args:
+        script_path: Path to the script file
+        model_path: Path to the trained model file
+        year: Optional year of the movie (default: 2020)
+        decade_encoded: Optional encoded decade (default: 0)
+        movie_length: Optional movie length in minutes (default: 120)
 
     Usage:
         rating = predict_rating('path/to/script.txt')
         print(f"Predicted Rating: {rating}/10")
+        
+        # With actual metadata for more accurate prediction:
+        rating = predict_rating('path/to/script.txt', year=2008, decade_encoded=2, movie_length=135)
     """
     # Load model package
     with open(model_path, 'rb') as f:
@@ -33,10 +43,10 @@ def predict_rating(script_path, model_path='imdb_model.pkl'):
     cleaned_text = ScriptPreprocessor.clean_text(raw_text)
     features = ScriptPreprocessor.extract_features(raw_text)
 
-    # Add default year/decade and movie_length
-    features['year'] = 2020
-    features['decade_encoded'] = 0
-    features['movie_length'] = 120  # Default average movie length in minutes
+    # Add year/decade and movie_length (use provided values or defaults)
+    features['year'] = year if year is not None else 2020
+    features['decade_encoded'] = decade_encoded if decade_encoded is not None else 0
+    features['movie_length'] = movie_length if movie_length is not None else 120
 
     # Transform - ensure features are in the correct order expected by the scaler
     X_tfidf = pkg['tfidf'].transform([cleaned_text])

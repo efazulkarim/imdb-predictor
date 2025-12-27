@@ -7,6 +7,7 @@ Handles training multiple models, evaluation, and saving.
 """
 
 import os
+import json
 import pickle
 import numpy as np
 import pandas as pd
@@ -21,20 +22,48 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from config import TEST_SIZE, RANDOM_STATE, MAX_TFIDF_FEATURES
 
 
-def train_and_evaluate(scripts_text, ratings, features_df):
-    """Train multiple models, evaluate, and return the best."""
+def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, script_files=None):
+    """Train multiple models, evaluate, and return the best.
+    
+    Args:
+        scripts_text: List of script texts
+        ratings: Array of IMDb ratings
+        features_df: DataFrame of extracted features
+        movie_names: Optional list of movie names (for saving test set)
+        script_files: Optional list of script filenames (for precise test set matching)
+    """
     print("\n" + "=" * 70)
     print("  MODEL TRAINING (70% Train / 30% Test)")
     print("=" * 70)
 
-    # === Data Split ===
+    # Create indices for tracking which movies go to train/test
+    indices = np.arange(len(scripts_text))
+    
+    # === Data Split (with indices) ===
     (X_text_train, X_text_test, 
      y_train, y_test,
-     X_feat_train, X_feat_test) = train_test_split(
-        scripts_text, ratings, features_df,
+     X_feat_train, X_feat_test,
+     idx_train, idx_test) = train_test_split(
+        scripts_text, ratings, features_df, indices,
         test_size=TEST_SIZE,
         random_state=RANDOM_STATE
     )
+    
+    # Save test set information for consistent external testing
+    if movie_names is not None:
+        test_set_info = {
+            'test_indices': idx_test.tolist(),
+            'test_movie_names': [movie_names[i] for i in idx_test],
+            'test_script_files': [script_files[i] for i in idx_test] if script_files else [],
+            'test_ratings': y_test.tolist(),
+            'train_indices': idx_train.tolist(),
+            'total_samples': len(scripts_text),
+            'test_size': TEST_SIZE,
+            'random_state': RANDOM_STATE
+        }
+        with open('test_set_info.json', 'w', encoding='utf-8') as f:
+            json.dump(test_set_info, f, indent=2)
+        print(f"\n💾 Test set info saved: 'test_set_info.json'")
 
     print(f"\n📊 Data Split:")
     print(f"   Training: {len(X_text_train)} samples ({100-TEST_SIZE*100:.0f}%)")
