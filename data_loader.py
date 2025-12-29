@@ -161,35 +161,23 @@ def load_dataset():
             df[col] = None
             print(f"   [WARNING] Column '{col}' not found in Excel files, added as empty")
     
-    # Remove duplicates carefully
-    # Check for duplicates based on Movie Name OR Script filename
+    # Remove duplicates by script filename only
+    # (Same script file = same movie, but same movie name could be remakes/different versions)
     initial_count = len(df)
     
     # Check for duplicates by script filename (most reliable - same script = same movie)
-    script_duplicates_before = df.duplicated(subset=[SCRIPT_COL], keep='first').sum()
+    script_duplicates = df.duplicated(subset=[SCRIPT_COL], keep='first').sum()
     
-    # Check for duplicates by movie name (same movie name might appear in both sheets)
-    movie_duplicates_before = df.duplicated(subset=[MOVIE_NAME_COL], keep='first').sum()
-    
-    # Remove duplicates: First remove by script filename (most reliable identifier)
-    # This handles cases where the same script file appears in both sheets
+    # Remove duplicates by script filename only
+    # Note: We do NOT remove by movie name since remakes/different versions are valid separate entries
     df = df.drop_duplicates(subset=[SCRIPT_COL], keep='first')
-    
-    # Then remove by movie name (handles cases where same movie has different script files)
-    # This catches any remaining duplicates where movie name matches but script file differs
-    movie_duplicates_after = df.duplicated(subset=[MOVIE_NAME_COL], keep='first').sum()
-    if movie_duplicates_after > 0:
-        df = df.drop_duplicates(subset=[MOVIE_NAME_COL], keep='first')
     
     total_duplicates_removed = initial_count - len(df)
     
     if total_duplicates_removed > 0:
         print(f"\n>> Duplicate Removal Summary:")
-        print(f"   - Removed {script_duplicates_before} duplicate(s) by script filename")
-        if movie_duplicates_after > 0:
-            print(f"   - Removed {movie_duplicates_after} additional duplicate(s) by movie name")
-        print(f"   - Total duplicates removed: {total_duplicates_removed}")
-        print(f"   - Kept first occurrence of each duplicate")
+        print(f"   - Removed {script_duplicates} duplicate(s) by script filename")
+        print(f"   - Note: Movies with same name but different scripts (remakes) are kept")
     else:
         print(f"\n[OK] No duplicates found - all {len(df)} records are unique")
     
