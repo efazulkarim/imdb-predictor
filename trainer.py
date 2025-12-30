@@ -22,6 +22,47 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from config import TEST_SIZE, RANDOM_STATE, MAX_TFIDF_FEATURES
 
 
+def compute_sample_weights(y):
+    """
+    Compute sample weights based on rating range frequency.
+    Underrepresented rating ranges get higher weights.
+    
+    Rating Ranges:
+        Low (1-4), Medium (4-6), Good (6-8), Excellent (8-10)
+    """
+    weights = np.ones(len(y))
+    
+    # Define rating ranges
+    ranges = [
+        (1, 4, 'Low'),
+        (4, 6, 'Medium'),
+        (6, 8, 'Good'),
+        (8, 10, 'Excellent')
+    ]
+    
+    # Count samples in each range
+    range_counts = {}
+    for low, high, name in ranges:
+        mask = (y >= low) & (y < high)
+        range_counts[name] = np.sum(mask)
+    
+    # Compute inverse frequency weights
+    total = len(y)
+    max_count = max(range_counts.values())
+    
+    print(f"\n⚖️  Sample Weights (Class Balancing):")
+    for low, high, name in ranges:
+        mask = (y >= low) & (y < high)
+        count = range_counts[name]
+        if count > 0:
+            # Weight = max_count / count (so minority classes get higher weight)
+            weight = max_count / count
+            weights[mask] = weight
+            print(f"   {name:12s} ({low}-{high}): n={count:4d}, weight={weight:.2f}x")
+    
+    return weights
+
+
 def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, script_files=None):
     """Train multiple models, evaluate, and return the best.
     
@@ -70,6 +111,9 @@ def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, scr
     print(f"   Testing:  {len(X_text_test)} samples ({TEST_SIZE*100:.0f}%)")
     print(f"   Rating range: {ratings.min():.1f} - {ratings.max():.1f}")
     print(f"   Mean rating: {ratings.mean():.2f} (std: {ratings.std():.2f})")
+
+    # === Compute Sample Weights for Training ===
+    sample_weights = compute_sample_weights(y_train)
 
     # === TF-IDF Vectorization ===
     print(f"\n🔤 Creating TF-IDF features (max {MAX_TFIDF_FEATURES} features)...")
@@ -145,8 +189,14 @@ def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, scr
     for name, model in models.items():
         print(f"\n🔄 Training {name}...")
 
-        # Train
-        model.fit(X_train, y_train)
+        # Train with sample weights
+        # Note: Ridge and ElasticNet don't support sample_weight natively,
+        # but RandomForest and GradientBoosting do
+        if hasattr(model, 'fit') and 'sample_weight' in model.fit.__code__.co_varnames:
+            model.fit(X_train, y_train, sample_weight=sample_weights)
+        else:
+            # For models that don't support sample_weight, train without
+            model.fit(X_train, y_train)
 
         # Predict
         y_pred = model.predict(X_test)
