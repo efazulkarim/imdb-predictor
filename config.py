@@ -30,7 +30,27 @@ MOVIE_NAME_COL = 'Movie name'
 MOVIE_LENGTH_COL = 'Movie length'
 
 # Model training parameters
-TEST_SIZE = 0.30          # 30% test, 70% train
+TEST_SIZE = 0.15          # 15% test (from total)
+VALIDATION_SIZE = 0.15    # 15% validation (from total) 
 RANDOM_STATE = 42
-MAX_TFIDF_FEATURES = 8000  # Vocabulary size for TF-IDF
 
+# ============================================================
+# SBERT (Sentence Transformer) Configuration
+# ============================================================
+SBERT_MODEL_NAME = 'all-MiniLM-L6-v2'  # Fast + good quality (384-dim output)
+SBERT_EMBEDDING_DIM = 384              # Output dimension of all-MiniLM-L6-v2
+
+# Chunking for long scripts (SBERT has ~256 token limit)
+CHUNK_SIZE = 256          # Words per chunk
+CHUNK_OVERLAP = 50        # Overlapping words between chunks for context continuity
+
+# ============================================================
+# Legacy Settings (kept for reference)
+# ============================================================
+# Word2Vec (deprecated - now using SBERT)
+EMBEDDING_DIM = 100       # Word2Vec vector dimension
+W2V_WINDOW = 5            # Context window size
+W2V_MIN_COUNT = 3         # Minimum word frequency
+
+# TF-IDF (deprecated)
+MAX_TFIDF_FEATURES = 8000  # Vocabulary size for TF-IDF
