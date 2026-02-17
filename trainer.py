@@ -42,7 +42,7 @@ def compute_sample_weights(y):
     """
     weights = np.ones(len(y))
     
-    # Define rating ranges
+    # Define rating ranges (last range uses inclusive upper bound for 10.0)
     ranges = [
         (1, 4, 'Low'),
         (4, 6, 'Medium'),
@@ -53,7 +53,8 @@ def compute_sample_weights(y):
     # Count samples in each range
     range_counts = {}
     for low, high, name in ranges:
-        mask = (y >= low) & (y < high)
+        is_last_range = high == 10
+        mask = (y >= low) & (y <= high) if is_last_range else (y >= low) & (y < high)
         range_counts[name] = np.sum(mask)
     
     # Compute inverse frequency weights
@@ -62,7 +63,8 @@ def compute_sample_weights(y):
     
     print(f"\n⚖️  Sample Weights (Class Balancing):")
     for low, high, name in ranges:
-        mask = (y >= low) & (y < high)
+        is_last_range = high == 10
+        mask = (y >= low) & (y <= high) if is_last_range else (y >= low) & (y < high)
         count = range_counts[name]
         if count > 0:
             # Weight = max_count / count (so minority classes get higher weight)
@@ -410,7 +412,8 @@ def detailed_analysis(results, best_model_name, y_test):
               (6, 8, 'Good (6-8)'), (8, 10, 'Excellent (8-10)')]
 
     for low, high, label in ranges:
-        mask = (y_test >= low) & (y_test < high)
+        is_last_range = high == 10
+        mask = (y_test >= low) & (y_test <= high) if is_last_range else (y_test >= low) & (y_test < high)
         if np.sum(mask) > 0:
             range_mae = np.mean(np.abs(y_pred[mask] - y_test[mask]))
             count = np.sum(mask)

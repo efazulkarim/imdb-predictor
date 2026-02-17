@@ -28,3 +28,7 @@ Thumbs.db
 
 # Large data files
 *.zip
+
+# Model checkpoints
+*.pt
+*.bin

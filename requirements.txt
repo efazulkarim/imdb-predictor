@@ -12,3 +12,7 @@ openpyxl==3.1.2
 # SBERT (Sentence Transformers)
 sentence-transformers>=2.2.0
 torch>=2.0.0
+
+# Longformer Deep Learning pipeline
+transformers>=4.30.0
+tqdm>=4.65.0
