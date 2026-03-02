@@ -1,0 +1,77 @@
+\chapter{Citation Tutorial}\label{chap:cite}
+This chapter shows how you can add references of publicastions and website urls and refer them.
+
+\section{Including references}
+In \textbf{main.tex}, you will find a line \begin{verbatim}
+    \input{Extensions/bibliography.tex}
+\end{verbatim} .
+\textbf{Don't delete it.} In the template given, the line will be there to include the references list.
+\section{Bibilography style}
+In \textbf{main.tex}
+, you can change the style of bibliography by uncommenting one of the following lines.
+\begin{verbatim}
+    \bibliographystyle{ieeetr} 
+    % \bibliographystyle{acm}
+\end{verbatim} They represent ieee transaction and ACM style respectively.
+
+\section{\texttt{references.bib} File}
+The project template will have a references.bib file. You will add your references there.
+
+\section{How to add references in .bib file}.
+
+Steps:
+\begin{enumerate}
+    \item Go to scholar.google.com and find the paper.
+    \item Click in the ending quotation sign beneath the paper description as shown in 
+    \Cref{fig:paper_desc}.
+    \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=50mm,scale=0.8]{Figures/references1.png}
+    \caption{Paper description in google scholar page.}
+    \label{fig:paper_desc}
+\end{figure}
+\item Click on ``Bibtex'' as shown in \Cref{fig:bib}.
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=50mm,scale=0.8]{Figures/references2.png}
+    \caption{Getting citation bibtex codes}
+    \label{fig:bib}
+\end{figure}
+\item Copy the whole code. Notice the arrowed line in \Cref{fig:bib_source}. You will need this to refer publications.
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=50mm,scale=0.8]{Figures/references3.png}
+    \caption{Copying bibtex source}
+    \label{fig:bib_source}
+\end{figure}
+\item Paste the code in references.bib file as shown in \Cref{fig:bib_use}.
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[scale=0.5]{Figures/references4.png}
+    \caption{Populating bibtex source}
+    \label{fig:bib_use}
+\end{figure}
+\item Use this kind of command for referring.
+\begin{verbatim}
+    \cite{kim1983computational}
+\end{verbatim}
+See, how \cite{kim1983computational} is referred here.
+\end{enumerate}
+
+\section{Citing a website}
+
+Here is how an entry of website in references.bib file looks like.
+\begin{verbatim}
+@misc{WinNT,
+title = {{MS Windows NT} Kernel Description},
+howpublished = {\url{http://web.archive.org/web/20080207010024/
+http://www.808multimedia.com/winnt/kernel.htm}},
+note = {Accessed:2010-09-30}
+}
+\end{verbatim}
+Use 
+\begin{verbatim}
+    \cite{WinNT}
+\end{verbatim}
+To refer this example site. See how we \cite{WinNT} referred it. You can use this sample bibtex code to refer any site- just change the label after \textbf{misc}, \textbf{title}, the site link in the bracket after \textbf{url}  and last accessed time in note.  
+\endinput

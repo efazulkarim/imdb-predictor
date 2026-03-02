@@ -1,0 +1,63 @@
+\chapter{Tutorial on Using Pictures}
+\label{chap:pic}
+\section{Single Figure}
+This demo is for setting up a single .jpg/.png image. See the corresponding source code to see how \Cref{fig:single_img} is used and referred to.
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=50mm,scale=0.5]{Information/SEULogo.png}
+    \caption{Demo for single image}
+    \label{fig:single_img}
+\end{figure}
+
+\section{Multiple Figure}
+This demo is for setting up multiple .jpg/.png images side by side (subfigures). See the corresponding source code to see how \Cref{fig:multi1} and \Cref{fig:multi2} is used and referred to. \Cref{fig:multi1} and \Cref{fig:multi2} are parts of \Cref{fig:multi}.
+
+\begin{figure}[htbp]
+\centering
+\begin{minipage}{0.3\textwidth}
+  \centering
+\includegraphics[width=0.4\textwidth]{Figures/SEULogo.png}
+\subcaption{First}\label{fig:multi1}
+\end{minipage}%
+\begin{minipage}{0.4\textwidth}
+  \centering
+\includegraphics[width=0.7\textwidth]{Figures/Backchannel-Lena-Soderberg-FA.jpg}
+\subcaption{Second}\label{fig:multi2}
+\end{minipage}%
+
+\caption{General caption.} \label{fig:multi}
+\end{figure}
+
+\section{Using .svg for Vector Graphics}
+This demo is for setting up a single .svg image. .svg is used for Vector graphics- stretching or shortening does not affect the details of the images. See the corresponding source code to see how \Cref{fig:svg} is used and referred to. See, you do not need to include .svg extension as filename in code.
+
+\begin{figure}[htbp]
+  \centering
+  
+  \includesvg[scale=0.3]{Figures/drawing} %No need to include .svg extension
+  
+  \caption{Demo for .svg image}
+  \label{fig:svg}
+
+\end{figure}
+
+\section{Multiple .svg Figures}
+
+This demo is for setting up multiple .svg images. See the corresponding sourcecode to see how \Cref{fig:multisvg1} and \Cref{fig:multisvg2} are used and referred to. They are parts of \Cref{fig:multiplesvg}.
+
+\begin{figure}[htbp]
+\centering
+\begin{minipage}{0.45\textwidth}
+  \centering
+\includesvg[scale=0.3]{Figures/drawing} %No need to include .svg
+\subcaption{First}\label{fig:multisvg1}
+\end{minipage}%
+\begin{minipage}{0.45\textwidth}
+  \centering
+\includesvg[scale=0.3]{Figures/drawing} %No need to include .svg
+\subcaption{Second}\label{fig:multisvg2}
+\end{minipage}
+\caption{General caption.} \label{fig:multiplesvg}
+\end{figure}
+
+\endinput

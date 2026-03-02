@@ -1,0 +1,28 @@
+\chapter{Clever reference}\label{chap:clref}
+You can use $\backslash$Cref{} and $\backslash$cref{} for clever referencing. If you do so, you do not need to specify if the referred item is a chapter or table or figure. See how we refer this logo of SEU in different styles.
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[scale=0.5]{Information/SEULogo.png}
+    \caption{Demo for single image}
+    \label{fig:seulogo}
+\end{figure}
+
+\begin{enumerate}
+    \item Using \begin{verbatim}
+    Figure~\ref{fig:seulogo}
+    \end{verbatim}
+    Figure~\ref{fig:seulogo}
+    \item Using \begin{verbatim}
+    \Cref{fig:seulogo}
+    \end{verbatim}
+    \Cref{fig:seulogo}
+    
+    \item Using \begin{verbatim}
+    \cref{fig:seulogo}
+    \end{verbatim}
+    \cref{fig:seulogo}
+    
+\end{enumerate}
+
+
+\endinput

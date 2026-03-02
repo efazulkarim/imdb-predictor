@@ -12,3 +12,6 @@ openpyxl==3.1.2
 # SBERT (Sentence Transformers)
 sentence-transformers>=2.2.0
 torch>=2.0.0
+
+# Visualizations
+matplotlib>=3.7.0

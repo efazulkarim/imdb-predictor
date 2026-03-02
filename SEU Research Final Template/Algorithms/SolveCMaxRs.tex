@@ -1,0 +1,56 @@
+\IncMargin{1em}
+
+
+\begin{algorithm}[!b]
+
+	\SetKwData{new}{new}
+	\SetKwFunction{searchmr}{SearchMR}
+	\SetKwFunction{scanslab}{ScanSlab}
+	\SetKwFunction{node}{Node}
+	\SetKwFunction{slicesearchmr}{SliceSearchMR}
+	\SetKwFunction{prepslice}{PrepareSlices}
+	\SetKwArray{slicearray}{SliceArray}
+	\SetKwArray{slabubarray}{SlabUpperBoundTreeArray}
+	\SetKwArray{sliceubtree}{SliceUpperBoundTree}
+	\SetKwArray{slicepubtree}{SlicePossibleUpperBoundTree}
+	
+	\SetKwInOut{Input}{Input}
+	\SetKwInOut{Output}{Output}
+	
+	\Input{ An $e^{+} (o_e)$ event, query size $a\times b$, and current maximal point $p^*_c$ }
+	\Output{ Updated maximal point $p^*_c$ }
+	\BlankLine
+	
+		$r_e \gets$ the $a\times b$ rectangle centered at $o_e$\;\label{initbeg}
+	$QTree.insert($\new \node{$r_e$}$)$\;\label{initend}
+
+	
+	$S_{e} \gets$ set of slices intersecting $r_e$\;\label{saffbeg}
+	$S_{lazy} \gets $ set of slices marked lazy\;
+	$isPrunable \gets true$\;
+	\For{\upshape{each} $s_i \in S_{e}$}
+		{
+		\If{ \upshape{after the addition} $R \cup r_e$ conforms to $X$}
+		{
+		$s_i.lazy \gets true$\;
+		$isPrunable \gets false$\;\label{saffend}
+		$S_{lazy} \leftarrow S_{lazy} \cup \{s_i\}$;
+		}
+		}
+	    \If { $isPrunable = true$\ }
+		{
+		\Return $p^*_c$	  \label{bye}	
+	
+		}
+	\label{hi}
+	
+	$\prepslice{$S_{lazy}$}$\;
+	$p_c \gets $ \slicesearchmr{$p^*_c$}\;	
+	
+	\Return $p^*_c$	\label{proend}  	
+		
+	\caption{SolveCMaxRS$^+$ $(e^{+} (o_e),a,b,p^*_c)$}\label{alg:monappcmrs}
+    \label{algo:solvecmaxrs}
+	
+	\end{algorithm}\DecMargin{1em} 
+	

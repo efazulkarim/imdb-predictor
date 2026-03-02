@@ -31,6 +31,12 @@ from config import (
     SBERT_MODEL_NAME, SBERT_EMBEDDING_DIM, CHUNK_SIZE, CHUNK_OVERLAP
 )
 
+try:
+    from visualizations import generate_all_visualizations
+    _VISUALIZATIONS_AVAILABLE = True
+except ImportError:
+    _VISUALIZATIONS_AVAILABLE = False
+
 
 def compute_sample_weights(y):
     """
@@ -306,15 +312,69 @@ def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, scr
     results = {}
     best_model_name = None
     best_val_rmse = float('inf')
+    eval_histories = {}  # Per-model training/val loss for visualization
 
     for name, model in models.items():
         print(f"\n🔄 Training {name}...")
 
-        # Train with sample weights
-        if hasattr(model, 'fit') and 'sample_weight' in model.fit.__code__.co_varnames:
-            model.fit(X_train, y_train, sample_weight=sample_weights)
+        # Train with sample weights; capture eval history for XGBoost/LightGBM
+        if name == 'XGBoost':
+            eval_set = [(X_train, y_train), (X_val, y_val)]
+            model.fit(
+                X_train, y_train,
+                sample_weight=sample_weights,
+                eval_set=eval_set,
+                verbose=False
+            )
+            evals = model.evals_result()
+            if evals:
+                # validation_0 = train, validation_1 = val
+                eval_histories[name] = {
+                    'train_rmse': evals.get('validation_0', {}).get('rmse', []),
+                    'val_rmse': evals.get('validation_1', {}).get('rmse', []),
+                }
+        elif name == 'LightGBM':
+            import lightgbm as lgb
+            evals_result = {}
+            model.fit(
+                X_train, y_train,
+                sample_weight=sample_weights,
+                eval_set=[(X_train, y_train), (X_val, y_val)],
+                callbacks=[lgb.record_evaluation(evals_result)]
+            )
+            if evals_result:
+                keys = list(evals_result.keys())
+                if len(keys) >= 2:
+                    d1, d2 = evals_result[keys[0]], evals_result[keys[1]]
+                    metric_key = 'l2' if 'l2' in d1 else ('rmse' if 'rmse' in d1 else next(iter(d1.keys()), None))
+                    if metric_key:
+                        v1 = np.array(d1.get(metric_key, []))
+                        v2 = np.array(d2.get(metric_key, []))
+                        eval_histories[name] = {
+                            'train_rmse': np.sqrt(v1).tolist() if metric_key == 'l2' else v1.tolist(),
+                            'val_rmse': np.sqrt(v2).tolist() if metric_key == 'l2' else v2.tolist(),
+                        }
+                    else:
+                        eval_histories[name] = None
+                else:
+                    eval_histories[name] = None
+            else:
+                eval_histories[name] = None
+        elif name == 'Gradient Boosting' and hasattr(model, 'staged_predict'):
+            if hasattr(model, 'fit') and 'sample_weight' in model.fit.__code__.co_varnames:
+                model.fit(X_train, y_train, sample_weight=sample_weights)
+            else:
+                model.fit(X_train, y_train)
+            train_rmse, val_rmse = [], []
+            for yt, yv in zip(model.staged_predict(X_train), model.staged_predict(X_val)):
+                train_rmse.append(np.sqrt(mean_squared_error(y_train, yt)))
+                val_rmse.append(np.sqrt(mean_squared_error(y_val, np.clip(yv, 1.0, 10.0))))
+            eval_histories[name] = {'train_rmse': train_rmse, 'val_rmse': val_rmse}
         else:
-            model.fit(X_train, y_train)
+            if hasattr(model, 'fit') and 'sample_weight' in model.fit.__code__.co_varnames:
+                model.fit(X_train, y_train, sample_weight=sample_weights)
+            else:
+                model.fit(X_train, y_train)
 
         # Predict on validation set
         y_val_pred = model.predict(X_val)
@@ -365,6 +425,22 @@ def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, scr
     print(f"   Test RMSE: {results[best_model_name]['Test_RMSE']:.4f}")
     print(f"   Test MAE:  {results[best_model_name]['Test_MAE']:.4f}")
     print(f"   Test R²:   {results[best_model_name]['Test_R2']:.4f}")
+
+    # === Generate Visualizations ===
+    if _VISUALIZATIONS_AVAILABLE:
+        train_val_history = eval_histories.get(best_model_name)
+        feature_names = [f'sbert_{i}' for i in range(SBERT_EMBEDDING_DIM)] + list(scaler.feature_names_in_)
+        generate_all_visualizations(
+            ratings=ratings,
+            y_test=y_test,
+            y_test_pred=results[best_model_name]['test_predictions'],
+            best_model=results[best_model_name]['model'],
+            best_model_name=best_model_name,
+            feature_names=feature_names,
+            train_val_history=train_val_history,
+        )
+    else:
+        print("\n   ⚠️  Visualizations skipped (install matplotlib to enable: pip install matplotlib)")
 
     return results, best_model_name, sbert_model, scaler, y_test, y_val
 
