@@ -1,7 +1,7 @@
 # IMDb RATING PREDICTOR - OPTIMIZED FOR MOVIE SCRIPTS
-# Version: 2.0 (Production Ready)
+# Version: 4.0 (SBERT + LightGBM/XGBoost)
 # Dataset: 5000 Movie Scripts + Excel Metadata
-# Split: 70% Training / 30% Testing
+# Split: 70% Training / 15% Validation / 15% Test
 # ============================================================
 
 import os
@@ -81,15 +81,16 @@ def main():
             return
 
     # Train models (pass movie_names and script_files to save test set info)
-    results, best_model_name, tfidf, scaler, y_test = train_and_evaluate(
+    results, best_model_name, sbert_model, scaler, y_test, y_val = train_and_evaluate(
         scripts_text, ratings, features_df, movie_names, script_files
     )
 
     # Detailed analysis
     detailed_analysis(results, best_model_name, y_test)
 
-    # Save model
-    save_model(results, best_model_name, tfidf, scaler, decade_encoder)
+    # Save model (pass SBERT model name for loading at inference)
+    from config import SBERT_MODEL_NAME
+    save_model(results, best_model_name, SBERT_MODEL_NAME, scaler, decade_encoder)
 
     # Usage instructions
     print("\n" + "=" * 70)

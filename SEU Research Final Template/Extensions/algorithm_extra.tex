@@ -1,0 +1,39 @@
+\chapter{Algorithms for IMDb Rating Prediction}
+%MARGIN FOR ALGORITHM
+
+This appendix presents the key algorithms used in the IMDb rating prediction system. The system uses SBERT (Sentence Transformer) embeddings with XGBoost for predicting movie ratings from scripts and metadata.
+
+\section{SBERT Embedding Generation}
+
+Function~\ref{func:sbert_embedding} describes the process of converting movie scripts to fixed-dimensional embedding vectors. Since movie scripts can be very long (often exceeding SBERT's token limit), we use a chunking strategy with overlapping windows and average pooling to generate a single document-level embedding.
+
+\clearpage
+\input{Algorithms/GenerateSBERTEmbedding.tex}
+
+The chunking approach with 50-word overlap ensures that context is preserved across chunk boundaries, while average pooling produces a robust document-level representation. The output is a 384-dimensional vector that captures semantic information about the script's content.
+
+\section{XGBoost Model Training}
+
+Algorithm~\ref{alg:train_xgboost} shows the complete training pipeline including data splitting, feature engineering, sample weighting for class balancing, and model evaluation.
+
+\clearpage
+\input{Algorithms/TrainXGBoostModel.tex}
+
+Key aspects of the training algorithm:
+
+\begin{itemize}
+    \item \textbf{Data Split} (Line~\ref{split}): 70\% training / 15\% validation / 15\% test
+    \item \textbf{SBERT Embeddings} (Lines~\ref{embed_train}-\ref{embed_test}): Generate semantic representations
+    \item \textbf{Feature Scaling}: Standardize numerical features (movie length, year, decade, script statistics)
+    \item \textbf{Feature Combination} (Lines~\ref{combine_train}-\ref{combine_test}): Concatenate SBERT embeddings with numerical features (403 total features)
+    \item \textbf{Class Balancing}: Compute sample weights to handle imbalanced rating distribution
+    \item \textbf{Evaluation}: Report RMSE, MAE, and R$^2$ on both validation and test sets
+\end{itemize}
+
+The final model achieved:
+\begin{itemize}
+    \item Validation: RMSE = 0.9419, MAE = 0.7067, R$^2$ = 0.5659
+    \item Test: RMSE = 0.9881, MAE = 0.7509, R$^2$ = 0.5762
+\end{itemize}
+
+This means the model explains approximately 57.6\% of the variance in IMDb ratings, with an average prediction error of 0.75 points on a 10-point scale.

@@ -1,0 +1,44 @@
+%MARGIN FOR ALGORITHM
+\IncMargin{1em}
+%START OF FUNCTION
+\begin{func}
+\begin{algorithm}[!p]
+%%%%SETTING KEYWORDS FOR STYLING THEM IN THE FUNCTION%%%%
+%%%%%%%%%
+%\SetKwData{x} {y} sets a data/datastructure y to be refered as x in the algorithm. See where subbst has been used in sourcecode and SliceUpperBoundBST in the algorithm.
+%%%%%%%%%
+
+\SetKwData{subbst} {SliceUpperBoundBST}
+%%%%%%%%%
+%\SetKwFunction{x} {y} sets a function y to be refered as x in the algorithm. See where scanslab has been used in sourcecode and ScanSlab in the algorithm.
+%%%%%%%%%
+
+\SetKwFunction{scanslab} {ScanSlab}
+
+%%%%%%%%%
+%Usage of Input,Output, Data( Persistent data like database)
+%%%%%%
+\KwInput{ A set of slices $S_{slice}$ }
+\KwOutput{Whatever}
+\KwData{$xyz$}
+%%%%LINEGAPE
+\BlankLine
+%%%%FOR LOOP BLOCK
+\For{ \upshape{each} $s_i$ \upshape{in} $S_{slice}$}
+{
+    %%%% \gets means assignment
+    $s_i.R \gets \text{ the set of rectangles currently intersecting with } s.i$\;
+    $(s_i.S_{slabs}, g_{maxub}) \gets $ \scanslab{$s_i.R$}\;
+    $\subbst.update(s_i.id,g_{maxub})$\;
+    $s_i.p_{c} \gets null$\;
+    $s_i.lazy \gets false$\;
+    $s_i.maxregsearched \gets false $\;
+}
+%%%%%CAPTIONING THE FUNCTION
+\caption{PrepareSlices$(S_{slice})$}
+\label{func:prepslice}
+%END OF FUNCTION
+\end{algorithm}
+\end{func}
+%MARGIN FOR ALGORITHM
+\DecMargin{1em}
