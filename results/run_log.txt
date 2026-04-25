@@ -34,5 +34,88 @@ Split: train=3636, val=779, test=780
 ----------------------------------------------------------------------
   SBERT EMBEDDINGS (one set per pooling strategy)
 ----------------------------------------------------------------------
-   Loading SBERT model 'all-MiniLM-L6-v2' for pooling='mean'...
-   Embedding 5195 scripts (pooling=mean)...
+   [cache] loaded SBERT embeddings (all-MiniLM-L6-v2, mean) from results/sbert_embeddings_all-MiniLM-L6-v2_mean.npz
+
+⚖️  Sample Weights (Class Balancing):
+   Low          (1-4): n= 371, weight=5.25x
+   Medium       (4-6): n=1947, weight=1.00x
+   Good         (6-8): n=1171, weight=1.66x
+   Excellent    (8-10): n= 147, weight=13.24x
+   Running baseline: predict_mean ...
+   Running baseline: ols_metadata ...
+   Running baseline: ols_structural ...
+   Running baseline: tfidf_xgboost ...
+
+----------------------------------------------------------------------
+  BOOTSTRAP METRICS (95% CI, n_boot=1000)
+----------------------------------------------------------------------
+
+  predict_mean
+    RMSE: 1.5184 [1.4561, 1.5794]
+    MAE:  1.2472 [1.1864, 1.3048]
+    R2:   -0.0007 [-0.0083, -0.0000]
+
+  ols_metadata
+    RMSE: 1.1844 [1.1283, 1.2388]
+    MAE:  0.9459 [0.8939, 0.9937]
+    R2:   0.3911 [0.3534, 0.4282]
+
+  ols_structural
+    RMSE: 1.1292 [1.0682, 1.1863]
+    MAE:  0.8814 [0.8314, 0.9270]
+    R2:   0.4466 [0.4070, 0.4892]
+
+  tfidf_xgboost
+    RMSE: 1.1288 [1.0599, 1.1947]
+    MAE:  0.8539 [0.8009, 0.9033]
+    R2:   0.4470 [0.3887, 0.5007]
+
+  sbert_xgboost
+    RMSE: 1.0321 [0.9739, 1.0939]
+    MAE:  0.7889 [0.7438, 0.8372]
+    R2:   0.5376 [0.4825, 0.5867]
+
+  sbert_xgboost_noweight
+    RMSE: 0.9974 [0.9417, 1.0553]
+    MAE:  0.7487 [0.7014, 0.7932]
+    R2:   0.5682 [0.5260, 0.6083]
+
+----------------------------------------------------------------------
+  PAIRED SIGNIFICANCE vs SBERT+XGBoost
+----------------------------------------------------------------------
+
+  predict_mean vs sbert_xgboost
+    delta_MAE = +0.4583  (95% CI [+0.3936, +0.5219])
+    Wilcoxon p = 4.25e-34
+    Winner: SBERT
+
+  ols_metadata vs sbert_xgboost
+    delta_MAE = +0.1570  (95% CI [+0.1120, +0.2000])
+    Wilcoxon p = 9.09e-11
+    Winner: SBERT
+
+  ols_structural vs sbert_xgboost
+    delta_MAE = +0.0925  (95% CI [+0.0535, +0.1322])
+    Wilcoxon p = 2.69e-05
+    Winner: SBERT
+
+  tfidf_xgboost vs sbert_xgboost
+    delta_MAE = +0.0649  (95% CI [+0.0153, +0.1081])
+    Wilcoxon p = 1.41e-02
+    Winner: SBERT
+
+  sbert_xgboost_noweight vs sbert_xgboost
+    delta_MAE = -0.0402  (95% CI [-0.0655, -0.0144])
+    Wilcoxon p = 1.20e-02
+    Winner: sbert_xgboost_noweight
+
+----------------------------------------------------------------------
+  SAVING ARTIFACTS
+----------------------------------------------------------------------
+   Saved results\comparison_table.json
+   Saved results/predictions.npz
+   Saved results\comparison_table.md
+
+======================================================================
+  DONE
+======================================================================

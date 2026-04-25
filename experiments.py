@@ -31,6 +31,15 @@ import time
 import argparse
 import numpy as np
 import pandas as pd
+
+# Windows consoles default to cp1252 which can't encode emoji used in
+# downstream print statements. Force UTF-8 with error-replacement so the
+# pipeline never crashes on stdout encoding issues.
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBRegressor
@@ -53,7 +62,10 @@ EMBEDDINGS_CACHE_TEMPLATE = 'results/sbert_embeddings_{model}_{pooling}.npz'
 
 # Pooling strategies to evaluate. The first one in the list is treated
 # as the "headline" SBERT system; the others appear as ablations.
-POOLING_STRATEGIES = ['mean', 'max', 'weighted_norm']
+# NOTE: each additional strategy currently re-runs full SBERT inference
+# (~2 hours per pass on CPU). For the headline run we keep just 'mean';
+# pooling ablation can be added back once chunk-level caching is in place.
+POOLING_STRATEGIES = ['mean']
 
 
 def _safe_filename(s):
