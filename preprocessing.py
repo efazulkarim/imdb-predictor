@@ -10,12 +10,24 @@ import re
 import numpy as np
 
 
+# Bumped whenever clean_text_for_sbert changes meaning, so that
+# downstream embedding caches invalidate automatically.
+SBERT_PREPROCESSING_VERSION = 2
+
+
 class ScriptPreprocessor:
     """Advanced preprocessing for movie scripts."""
 
     @staticmethod
     def clean_text(text):
-        """Clean and normalize script text."""
+        """
+        Aggressive normalization used for the structural / TF-IDF pipelines.
+
+        Lowercases, strips stage directions, character names, timestamps,
+        and most punctuation. Suitable for bag-of-words style features
+        but NOT ideal as input to SBERT (which is trained on cased,
+        fully-punctuated natural language).
+        """
         # Convert to lowercase
         text = text.lower()
 
@@ -36,6 +48,46 @@ class ScriptPreprocessor:
 
         # Normalize whitespace
         text = re.sub(r'\s+', ' ', text).strip()
+
+        return text
+
+    @staticmethod
+    def clean_text_for_sbert(text):
+        """
+        Light cleaning suitable as SBERT input.
+
+        Preserves case and natural punctuation (which SBERT was trained
+        on), but removes obvious screenplay artifacts that would otherwise
+        dominate the embedding:
+            - stage directions in [brackets] and (parens)
+            - ALL-CAPS character cues at start of line ("JOHN:")
+            - INT./EXT. scene heading prefixes
+            - timestamps and scene numbers
+
+        Compared to clean_text, this keeps:
+            - case (so SBERT sees real sentences)
+            - quotes, dashes, semicolons, etc. (sentence boundaries)
+            - paragraph breaks
+        """
+        # Stage directions
+        text = re.sub(r'\[.*?\]', ' ', text)
+        text = re.sub(r'\(.*?\)', ' ', text)
+
+        # Character cue lines: "JOHN:" or "MARY ANN:" at start of line.
+        # Case-sensitive so we don't strip ordinary "Word:" inside dialogue.
+        text = re.sub(r'^[A-Z][A-Z0-9\s]{1,30}:', ' ', text, flags=re.MULTILINE)
+
+        # INT. / EXT. scene heading markers
+        text = re.sub(r'\b(INT|EXT)\.?\s', ' ', text)
+
+        # Timestamps and explicit scene numbers
+        text = re.sub(r'\d{1,2}:\d{2}(:\d{2})?', ' ', text)
+        text = re.sub(r'\bscene\s*\d+\b', ' ', text, flags=re.IGNORECASE)
+
+        # Normalize whitespace but preserve sentence structure
+        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r'\n\s*\n+', '\n\n', text)
+        text = text.strip()
 
         return text
 

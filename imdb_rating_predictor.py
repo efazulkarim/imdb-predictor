@@ -71,7 +71,7 @@ def main():
         return
 
     # Load data
-    scripts_text, ratings, features_df, movie_names, script_files, decade_encoder = load_dataset()
+    scripts_text, ratings, features_df, movie_names, script_files, decade_encoder, scripts_text_sbert = load_dataset()
 
     if len(scripts_text) < 100:
         print("\n⚠️  WARNING: Less than 100 scripts loaded!")
@@ -82,7 +82,8 @@ def main():
 
     # Train models (pass movie_names and script_files to save test set info)
     results, best_model_name, sbert_model, scaler, y_test, y_val = train_and_evaluate(
-        scripts_text, ratings, features_df, movie_names, script_files
+        scripts_text, ratings, features_df, movie_names, script_files,
+        scripts_text_sbert=scripts_text_sbert,
     )
 
     # Detailed analysis

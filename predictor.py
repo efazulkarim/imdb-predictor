@@ -116,7 +116,7 @@ def predict_rating(script_path, model_path='imdb_model.pkl', year=None, decade_e
     with open(script_path, 'r', encoding='utf-8', errors='ignore') as f:
         raw_text = f.read()
 
-    cleaned_text = ScriptPreprocessor.clean_text(raw_text)
+    cleaned_text = ScriptPreprocessor.clean_text_for_sbert(raw_text)
     features = ScriptPreprocessor.extract_features(raw_text)
 
     # Add year/decade and movie_length (use provided values or defaults)
@@ -162,7 +162,7 @@ def predict_from_text(script_text, model_path='imdb_model.pkl'):
     with open(model_path, 'rb') as f:
         pkg = pickle.load(f)
 
-    cleaned_text = ScriptPreprocessor.clean_text(script_text)
+    cleaned_text = ScriptPreprocessor.clean_text_for_sbert(script_text)
     features = ScriptPreprocessor.extract_features(script_text)
     features['year'] = 2020
     features['decade_encoded'] = 0

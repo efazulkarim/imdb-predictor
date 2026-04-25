@@ -113,52 +113,92 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
     return chunks
 
 
-def embed_scripts_sbert(scripts_text, sbert_model, show_progress=True):
+def _pool_chunks(chunk_embeddings, strategy='mean'):
+    """
+    Aggregate per-chunk embeddings into a single document embedding.
+
+    Strategies:
+        'mean'         - simple average (default; baseline)
+        'max'          - per-dimension max
+        'weighted_norm'- weighted average where weight = L2 norm of each chunk
+                         (chunks with higher activation magnitude are louder)
+        'mean_max'     - concatenate mean and max (doubles output dim)
+    """
+    if len(chunk_embeddings) == 0:
+        return None
+
+    if strategy == 'mean':
+        return np.mean(chunk_embeddings, axis=0)
+    if strategy == 'max':
+        return np.max(chunk_embeddings, axis=0)
+    if strategy == 'weighted_norm':
+        norms = np.linalg.norm(chunk_embeddings, axis=1)
+        if norms.sum() == 0:
+            return np.mean(chunk_embeddings, axis=0)
+        weights = norms / norms.sum()
+        return (chunk_embeddings * weights[:, None]).sum(axis=0)
+    if strategy == 'mean_max':
+        return np.concatenate([
+            np.mean(chunk_embeddings, axis=0),
+            np.max(chunk_embeddings, axis=0),
+        ])
+    raise ValueError(f"Unknown pooling strategy: {strategy}")
+
+
+def embed_scripts_sbert(scripts_text, sbert_model, show_progress=True, pooling='mean'):
     """
     Convert scripts to SBERT embeddings with chunking for long texts.
-    
+
     Args:
         scripts_text: List of script texts
         sbert_model: Loaded SentenceTransformer model
         show_progress: Whether to print progress updates
-    
+        pooling: Aggregation strategy across chunks. One of
+            {'mean', 'max', 'weighted_norm', 'mean_max'}.
+            'mean' reproduces the original (legacy) behavior.
+
     Returns:
-        numpy array of shape (n_scripts, embedding_dim)
+        numpy array of shape (n_scripts, output_dim).
+        output_dim equals SBERT_EMBEDDING_DIM, except for 'mean_max' which is 2x.
     """
     embeddings = []
     total = len(scripts_text)
-    
+    out_dim = SBERT_EMBEDDING_DIM * (2 if pooling == 'mean_max' else 1)
+
     for i, script in enumerate(scripts_text):
         if show_progress and (i + 1) % 500 == 0:
-            print(f"   Embedding progress: {i + 1}/{total} scripts...")
-        
+            print(f"   Embedding progress: {i + 1}/{total} scripts (pool={pooling})...")
+
         # Chunk the script
         chunks = chunk_text(script)
-        
+
         # Embed all chunks
         chunk_embeddings = sbert_model.encode(chunks, show_progress_bar=False)
-        
-        # Average chunk embeddings to get single document embedding
-        if len(chunk_embeddings) > 0:
-            doc_embedding = np.mean(chunk_embeddings, axis=0)
-        else:
-            doc_embedding = np.zeros(SBERT_EMBEDDING_DIM)
-        
+
+        doc_embedding = _pool_chunks(chunk_embeddings, strategy=pooling)
+        if doc_embedding is None:
+            doc_embedding = np.zeros(out_dim)
+
         embeddings.append(doc_embedding)
-    
+
     return np.array(embeddings)
 
 
-def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, script_files=None):
+def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, script_files=None, scripts_text_sbert=None):
     """Train multiple models, evaluate, and return the best.
-    
+
     Args:
-        scripts_text: List of script texts
+        scripts_text: List of (aggressively cleaned) script texts -- used as a
+            fallback if scripts_text_sbert is not provided.
         ratings: Array of IMDb ratings
         features_df: DataFrame of extracted features
         movie_names: Optional list of movie names (for saving test set)
         script_files: Optional list of script filenames (for precise test set matching)
+        scripts_text_sbert: Optional list of lightly-cleaned texts to feed to SBERT.
+            When None, falls back to scripts_text (legacy behavior).
     """
+    if scripts_text_sbert is None:
+        scripts_text_sbert = scripts_text
     print("\n" + "=" * 70)
     print("  MODEL TRAINING (70% Train / 15% Validation / 15% Test)")
     print("=" * 70)
@@ -166,8 +206,9 @@ def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, scr
     # Create indices for tracking which movies go to train/val/test
     indices = np.arange(len(scripts_text))
     
-    # Convert scripts to list for easier indexing
-    scripts_list = list(scripts_text)
+    # Convert scripts to list for easier indexing.
+    # We use the SBERT-friendly (lightly cleaned) variant as model input.
+    scripts_list = list(scripts_text_sbert)
     
     # === Data Split: Train / Temp (Val+Test) ===
     temp_size = TEST_SIZE + VALIDATION_SIZE  # 30% for temp (val + test)
@@ -258,40 +299,55 @@ def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, scr
     print(f"   Combined features: {X_train.shape[1]} (SBERT: {SBERT_EMBEDDING_DIM} + Numerical: {X_num_train.shape[1]})")
 
     # === Define Models ===
+    # Tightened to reduce overfitting:
+    #  - RF: max_depth 30 -> 12, min_samples_leaf 2 -> 5
+    #  - GB: n_iter_no_change for early stopping on internal val split
+    #  - XGB / LGBM: early_stopping_rounds=20 on the validation set
     models = {
         'Random Forest': RandomForestRegressor(
             n_estimators=300,
-            max_depth=30,
-            min_samples_split=5,
-            min_samples_leaf=2,
+            max_depth=12,
+            min_samples_split=10,
+            min_samples_leaf=5,
             max_features='sqrt',
             random_state=RANDOM_STATE,
             n_jobs=-1
         ),
         'Gradient Boosting': GradientBoostingRegressor(
-            n_estimators=200,
-            max_depth=8,
-            learning_rate=0.08,
+            n_estimators=500,
+            max_depth=6,
+            learning_rate=0.05,
             subsample=0.8,
             min_samples_split=10,
+            min_samples_leaf=5,
+            validation_fraction=0.1,
+            n_iter_no_change=20,
+            tol=1e-4,
             random_state=RANDOM_STATE
         ),
         'LightGBM': LGBMRegressor(
-            n_estimators=300,
+            n_estimators=1000,
             learning_rate=0.05,
             num_leaves=31,
             max_depth=-1,
+            min_child_samples=20,
+            reg_alpha=0.1,
+            reg_lambda=0.1,
             random_state=RANDOM_STATE,
             n_jobs=-1,
             verbose=-1
         ),
         'XGBoost': XGBRegressor(
-            n_estimators=300,
+            n_estimators=1000,
             learning_rate=0.05,
             max_depth=6,
+            reg_alpha=0.1,
+            reg_lambda=1.0,
             random_state=RANDOM_STATE,
             n_jobs=-1,
-            verbosity=0
+            verbosity=0,
+            tree_method='hist',
+            early_stopping_rounds=20
         ),
         'Ridge Regression': Ridge(
             alpha=1.5,
@@ -340,7 +396,10 @@ def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, scr
                 X_train, y_train,
                 sample_weight=sample_weights,
                 eval_set=[(X_train, y_train), (X_val, y_val)],
-                callbacks=[lgb.record_evaluation(evals_result)]
+                callbacks=[
+                    lgb.record_evaluation(evals_result),
+                    lgb.early_stopping(stopping_rounds=20, verbose=False),
+                ]
             )
             if evals_result:
                 keys = list(evals_result.keys())

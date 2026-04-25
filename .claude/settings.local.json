@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python stats_utils.py)",
+      "Bash(./.venv/Scripts/python.exe stats_utils.py)",
+      "Bash(./.venv/Scripts/python.exe -c \"import baselines; print\\('ok'\\); print\\([f for f in dir\\(baselines\\) if not f.startswith\\('_'\\)]\\)\")",
+      "Bash(./.venv/Scripts/python.exe experiments.py)",
+      "Bash(tasklist)"
+    ]
+  }
+}

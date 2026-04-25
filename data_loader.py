@@ -213,7 +213,8 @@ def load_dataset():
     print(f"   Note: Scripts not found will be skipped automatically")
 
     # Data containers
-    scripts_text = []
+    scripts_text = []          # aggressive cleaning (TF-IDF, structural use)
+    scripts_text_sbert = []    # light cleaning (SBERT input)
     script_features = []
     script_files = []  # Track script filenames for test set saving
     ratings = []
@@ -298,10 +299,12 @@ def load_dataset():
 
             # Preprocess and extract features
             cleaned_text = ScriptPreprocessor.clean_text(raw_text)
+            cleaned_text_sbert = ScriptPreprocessor.clean_text_for_sbert(raw_text)
             features = ScriptPreprocessor.extract_features(raw_text)
 
             # Store data
             scripts_text.append(cleaned_text)
+            scripts_text_sbert.append(cleaned_text_sbert)
             script_features.append(features)
             script_files.append(os.path.basename(filepath))  # Save script filename
             ratings.append(rating)
@@ -342,7 +345,7 @@ def load_dataset():
     le = LabelEncoder()
     features_df['decade_encoded'] = le.fit_transform(decades)
 
-    return scripts_text, np.array(ratings), features_df, movie_names, script_files, le
+    return scripts_text, np.array(ratings), features_df, movie_names, script_files, le, scripts_text_sbert
 
 
 # ============================================================
@@ -351,7 +354,7 @@ def load_dataset():
 if __name__ == "__main__":
     print("Testing data loader...")
     try:
-        scripts_text, ratings, features_df, movie_names, script_files, decade_encoder = load_dataset()
+        scripts_text, ratings, features_df, movie_names, script_files, decade_encoder, scripts_text_sbert = load_dataset()
         print(f"\n[OK] Successfully loaded {len(scripts_text)} scripts!")
         print(f"   Rating range: {ratings.min():.2f} - {ratings.max():.2f}")
         print(f"   Mean rating: {ratings.mean():.2f}")

@@ -1,0 +1,38 @@
+======================================================================
+  EXPERIMENT RUNNER  (single 70/15/15 split)
+  SBERT model: all-MiniLM-L6-v2
+======================================================================
+======================================================================
+  LOADING DATASET
+======================================================================
+
+>> Loading from single Excel file:
+   [OK] movie_lengths.xlsx: 5204 records (Ratings: 1.5-9.3)
+
+[OK] No duplicates found - all 5204 records are unique
+
+>> Combined dataset: 5204 unique records
+   Columns (8 total): Movie name, Year, IMDb Rating, IMDb ID, .txt Files, Collected By, Decade, Movie length
+   [OK] All expected columns present
+   Rating range: 1.5 - 9.3 (mean: 5.98)
+   Note: Scripts not found will be skipped automatically
+
+>> Loading scripts from: scripts/
+   Processing.......... Done!
+
+>> Loading Summary:
+   [OK] Successfully loaded: 5195 scripts
+   [X] Skipped: 9 total
+      - Missing files: 0
+      - Too short (<1KB): 9
+      - Invalid rating: 0
+      - Read errors: 0
+
+Loaded 5195 scripts.
+Split: train=3636, val=779, test=780
+
+----------------------------------------------------------------------
+  SBERT EMBEDDINGS (one set per pooling strategy)
+----------------------------------------------------------------------
+   Loading SBERT model 'all-MiniLM-L6-v2' for pooling='mean'...
+   Embedding 5195 scripts (pooling=mean)...
