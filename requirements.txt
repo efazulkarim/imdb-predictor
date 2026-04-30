@@ -15,3 +15,6 @@ torch>=2.0.0
 
 # Visualizations
 matplotlib>=3.7.0
+
+# Hyperparameter search
+optuna>=4.0.0

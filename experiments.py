@@ -50,7 +50,7 @@ from config import (
 )
 from data_loader import load_dataset
 from preprocessing import SBERT_PREPROCESSING_VERSION
-from trainer import compute_sample_weights, embed_scripts_sbert
+from trainer import compute_sample_weights, embed_scripts_sbert, embed_scripts_sbert_multi
 import baselines
 import stats_utils
 
@@ -62,10 +62,9 @@ EMBEDDINGS_CACHE_TEMPLATE = 'results/sbert_embeddings_{model}_{pooling}.npz'
 
 # Pooling strategies to evaluate. The first one in the list is treated
 # as the "headline" SBERT system; the others appear as ablations.
-# NOTE: each additional strategy currently re-runs full SBERT inference
-# (~2 hours per pass on CPU). For the headline run we keep just 'mean';
-# pooling ablation can be added back once chunk-level caching is in place.
-POOLING_STRATEGIES = ['mean']
+# Multiple poolings now share a single SBERT inference pass via
+# embed_scripts_sbert_multi(), so adding strategies is essentially free.
+POOLING_STRATEGIES = ['mean', 'max', 'mean_max']
 
 
 def _safe_filename(s):
@@ -90,52 +89,95 @@ def _split_indices(n_samples, ratings, seed=RANDOM_STATE):
     return idx_train, idx_val, idx_test
 
 
-def _get_or_build_embeddings(scripts_text, model_name, pooling='mean', force=False):
-    """
-    Compute (or load cached) SBERT embeddings for ALL scripts.
-
-    Cache key is (model_name, n_scripts, chunk_size, overlap, pooling,
-    preprocessing_version). If any field changes, we recompute.
-    """
-    cache_path = EMBEDDINGS_CACHE_TEMPLATE.format(
-        model=_safe_filename(model_name), pooling=pooling
-    )
-    cache_key = {
+def _make_cache_key(model_name, n_scripts, pooling):
+    return {
         'model_name': model_name,
-        'n_scripts': len(scripts_text),
+        'n_scripts': n_scripts,
         'chunk_size': CHUNK_SIZE,
         'chunk_overlap': CHUNK_OVERLAP,
         'pooling': pooling,
         'preprocessing_version': SBERT_PREPROCESSING_VERSION,
     }
 
-    if not force and os.path.exists(cache_path):
-        try:
-            cached = np.load(cache_path, allow_pickle=True)
-            cached_meta = json.loads(str(cached['meta']))
-            if cached_meta == cache_key:
-                print(f"   [cache] loaded SBERT embeddings ({model_name}, {pooling}) from {cache_path}")
-                return cached['embeddings']
-            else:
-                print(f"   [cache] stale ({pooling}), recomputing")
-        except Exception as e:
-            print(f"   [cache] could not load {cache_path} ({e}), recomputing")
 
-    print(f"   Loading SBERT model '{model_name}' for pooling='{pooling}'...")
-    from sentence_transformers import SentenceTransformer
-    sbert_model = SentenceTransformer(model_name)
+def _try_load_pooling_cache(model_name, scripts_text, pooling):
+    """Return cached embeddings for one (model, pooling) if hash matches, else None."""
+    cache_path = EMBEDDINGS_CACHE_TEMPLATE.format(
+        model=_safe_filename(model_name), pooling=pooling
+    )
+    if not os.path.exists(cache_path):
+        return None
+    try:
+        cached = np.load(cache_path, allow_pickle=True)
+        cached_meta = json.loads(str(cached['meta']))
+    except Exception as e:
+        print(f"   [cache] could not load {cache_path} ({e})")
+        return None
+    if cached_meta != _make_cache_key(model_name, len(scripts_text), pooling):
+        print(f"   [cache] stale ({pooling}); will recompute")
+        return None
+    print(f"   [cache] loaded {model_name} / {pooling} from {cache_path}")
+    return cached['embeddings']
 
-    print(f"   Embedding {len(scripts_text)} scripts (pooling={pooling})...")
-    t0 = time.time()
-    embeddings = embed_scripts_sbert(scripts_text, sbert_model, pooling=pooling)
-    print(f"   Done in {time.time() - t0:.1f}s. Shape: {embeddings.shape}")
 
+def _save_pooling_cache(model_name, scripts_text, pooling, embeddings):
+    cache_path = EMBEDDINGS_CACHE_TEMPLATE.format(
+        model=_safe_filename(model_name), pooling=pooling
+    )
     _ensure_dir(RESULTS_DIR)
     np.savez(cache_path,
              embeddings=embeddings,
-             meta=json.dumps(cache_key))
-    print(f"   [cache] saved to {cache_path}")
-    return embeddings
+             meta=json.dumps(_make_cache_key(model_name, len(scripts_text), pooling)))
+    print(f"   [cache] saved {pooling} -> {cache_path}")
+
+
+def _get_or_build_embeddings(scripts_text, model_name, pooling='mean', force=False):
+    """Single-pooling convenience wrapper around _get_or_build_embeddings_multi."""
+    out = _get_or_build_embeddings_multi(
+        scripts_text, model_name, poolings=[pooling], force=force,
+    )
+    return out[pooling]
+
+
+def _get_or_build_embeddings_multi(scripts_text, model_name, poolings=('mean',), force=False):
+    """
+    Compute (or load cached) SBERT embeddings for ALL scripts and ALL
+    requested pooling strategies, sharing one SBERT inference pass over
+    any poolings whose caches are missing or stale.
+
+    Returns:
+        dict {pooling_name: np.ndarray}
+    """
+    out = {}
+    missing = []
+
+    if force:
+        missing = list(poolings)
+    else:
+        for p in poolings:
+            cached = _try_load_pooling_cache(model_name, scripts_text, p)
+            if cached is not None:
+                out[p] = cached
+            else:
+                missing.append(p)
+
+    if not missing:
+        return out
+
+    print(f"   Loading SBERT model '{model_name}' for poolings={missing}...")
+    from sentence_transformers import SentenceTransformer
+    sbert_model = SentenceTransformer(model_name)
+
+    print(f"   Embedding {len(scripts_text)} scripts in a single pass over {len(missing)} pooling strategies...")
+    t0 = time.time()
+    new_embs = embed_scripts_sbert_multi(scripts_text, sbert_model, poolings=missing)
+    print(f"   Done in {time.time() - t0:.1f}s.")
+
+    for p, emb in new_embs.items():
+        out[p] = emb
+        _save_pooling_cache(model_name, scripts_text, p, emb)
+
+    return out
 
 
 def run_sbert_xgboost(
@@ -319,10 +361,9 @@ def main_single(sbert_model_name=SBERT_MODEL_NAME, output_suffix=''):
     print("\n" + "-" * 70)
     print("  SBERT EMBEDDINGS (one set per pooling strategy)")
     print("-" * 70)
-    embeddings_by_pool = {
-        pool: _get_or_build_embeddings(scripts_text_sbert, sbert_model_name, pooling=pool)
-        for pool in POOLING_STRATEGIES
-    }
+    embeddings_by_pool = _get_or_build_embeddings_multi(
+        scripts_text_sbert, sbert_model_name, poolings=POOLING_STRATEGIES,
+    )
 
     # 4. Train all models on this split.
     all_preds = _run_one_split(
@@ -433,10 +474,9 @@ def main_cv(k=5, seed=RANDOM_STATE, sbert_model_name=SBERT_MODEL_NAME, output_su
     print("\n" + "-" * 70)
     print("  SBERT EMBEDDINGS (one set per pooling strategy)")
     print("-" * 70)
-    embeddings_by_pool = {
-        pool: _get_or_build_embeddings(scripts_text_sbert, sbert_model_name, pooling=pool)
-        for pool in POOLING_STRATEGIES
-    }
+    embeddings_by_pool = _get_or_build_embeddings_multi(
+        scripts_text_sbert, sbert_model_name, poolings=POOLING_STRATEGIES,
+    )
 
     # 2. Run each fold.
     kf = KFold(n_splits=k, shuffle=True, random_state=seed)

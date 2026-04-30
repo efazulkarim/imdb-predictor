@@ -155,33 +155,72 @@ def embed_scripts_sbert(scripts_text, sbert_model, show_progress=True, pooling='
         show_progress: Whether to print progress updates
         pooling: Aggregation strategy across chunks. One of
             {'mean', 'max', 'weighted_norm', 'mean_max'}.
-            'mean' reproduces the original (legacy) behavior.
 
     Returns:
         numpy array of shape (n_scripts, output_dim).
-        output_dim equals SBERT_EMBEDDING_DIM, except for 'mean_max' which is 2x.
+
+    Note: for multiple pooling strategies on the same model, prefer
+    embed_scripts_sbert_multi() — it shares the SBERT inference pass.
     """
-    embeddings = []
+    out = embed_scripts_sbert_multi(
+        scripts_text, sbert_model,
+        poolings=[pooling], show_progress=show_progress,
+    )
+    return out[pooling]
+
+
+def embed_scripts_sbert_multi(scripts_text, sbert_model, poolings=('mean',), show_progress=True):
+    """
+    Encode every script once and compute multiple pooling strategies from
+    the same per-chunk embeddings.
+
+    This is the key optimization that makes pooling ablations cheap: SBERT
+    inference dominates wall-clock time, so amortizing it across N pooling
+    strategies cuts cost roughly N-fold compared to the legacy code path
+    that re-encoded for every pooling.
+
+    Args:
+        scripts_text: List of script texts
+        sbert_model: Loaded SentenceTransformer model
+        poolings: Iterable of pooling names. Each name must be one of
+            {'mean', 'max', 'weighted_norm', 'mean_max'}.
+        show_progress: Whether to print progress updates.
+
+    Returns:
+        dict {pooling_name: np.ndarray of shape (n_scripts, out_dim)}.
+        out_dim = encoder dim (or 2x encoder dim for 'mean_max').
+    """
+    poolings = list(poolings)
+    if not poolings:
+        raise ValueError("At least one pooling strategy is required")
+
+    encoder_dim = sbert_model.get_sentence_embedding_dimension()
+
+    # Pre-allocate per-pooling output buffers as Python lists.
+    out = {p: [] for p in poolings}
+    out_dims = {
+        p: encoder_dim * (2 if p == 'mean_max' else 1)
+        for p in poolings
+    }
+
     total = len(scripts_text)
-    out_dim = SBERT_EMBEDDING_DIM * (2 if pooling == 'mean_max' else 1)
+    pool_label = '+'.join(poolings)
 
     for i, script in enumerate(scripts_text):
         if show_progress and (i + 1) % 500 == 0:
-            print(f"   Embedding progress: {i + 1}/{total} scripts (pool={pooling})...")
+            print(f"   Embedding progress: {i + 1}/{total} scripts "
+                  f"(pool={pool_label})...")
 
-        # Chunk the script
         chunks = chunk_text(script)
-
-        # Embed all chunks
         chunk_embeddings = sbert_model.encode(chunks, show_progress_bar=False)
 
-        doc_embedding = _pool_chunks(chunk_embeddings, strategy=pooling)
-        if doc_embedding is None:
-            doc_embedding = np.zeros(out_dim)
+        for p in poolings:
+            doc_embedding = _pool_chunks(chunk_embeddings, strategy=p)
+            if doc_embedding is None:
+                doc_embedding = np.zeros(out_dims[p])
+            out[p].append(doc_embedding)
 
-        embeddings.append(doc_embedding)
-
-    return np.array(embeddings)
+    return {p: np.array(out[p]) for p in poolings}
 
 
 def train_and_evaluate(scripts_text, ratings, features_df, movie_names=None, script_files=None, scripts_text_sbert=None):

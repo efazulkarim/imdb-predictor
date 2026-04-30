@@ -1,0 +1,204 @@
+======================================================================
+  EXPERIMENT RUNNER  (5-fold cross-validation)
+  SBERT model: all-MiniLM-L6-v2
+======================================================================
+======================================================================
+  LOADING DATASET
+======================================================================
+
+>> Loading from single Excel file:
+   [OK] movie_lengths.xlsx: 5204 records (Ratings: 1.5-9.3)
+
+[OK] No duplicates found - all 5204 records are unique
+
+>> Combined dataset: 5204 unique records
+   Columns (8 total): Movie name, Year, IMDb Rating, IMDb ID, .txt Files, Collected By, Decade, Movie length
+   [OK] All expected columns present
+   Rating range: 1.5 - 9.3 (mean: 5.98)
+   Note: Scripts not found will be skipped automatically
+
+>> Loading scripts from: scripts/
+   Processing.......... Done!
+
+>> Loading Summary:
+   [OK] Successfully loaded: 5195 scripts
+   [X] Skipped: 9 total
+      - Missing files: 0
+      - Too short (<1KB): 9
+      - Invalid rating: 0
+      - Read errors: 0
+
+Loaded 5195 scripts.
+
+----------------------------------------------------------------------
+  SBERT EMBEDDINGS (one set per pooling strategy)
+----------------------------------------------------------------------
+   [cache] loaded SBERT embeddings (all-MiniLM-L6-v2, mean) from results/sbert_embeddings_all-MiniLM-L6-v2_mean.npz
+
+--- Fold 1/5: train=3376, val=780, test=1039
+
+⚖️  Sample Weights (Class Balancing):
+   Low          (1-4): n= 358, weight=5.00x
+   Medium       (4-6): n=1790, weight=1.00x
+   Good         (6-8): n=1085, weight=1.65x
+   Excellent    (8-10): n= 143, weight=12.52x
+   Running baseline: predict_mean ...
+   Running baseline: ols_metadata ...
+   Running baseline: ols_structural ...
+   Running baseline: tfidf_xgboost ...
+   Fold 1 test RMSE:
+      predict_mean                   1.4932
+      ols_metadata                   1.1788
+      ols_structural                 1.1197
+      tfidf_xgboost                  1.1143
+      sbert_xgboost                  1.0304
+      sbert_xgboost_noweight         0.9814
+
+--- Fold 2/5: train=3376, val=780, test=1039
+
+⚖️  Sample Weights (Class Balancing):
+   Low          (1-4): n= 377, weight=4.65x
+   Medium       (4-6): n=1754, weight=1.00x
+   Good         (6-8): n=1093, weight=1.60x
+   Excellent    (8-10): n= 152, weight=11.54x
+   Running baseline: predict_mean ...
+   Running baseline: ols_metadata ...
+   Running baseline: ols_structural ...
+   Running baseline: tfidf_xgboost ...
+   Fold 2 test RMSE:
+      predict_mean                   1.4176
+      ols_metadata                   1.1382
+      ols_structural                 1.0649
+      tfidf_xgboost                  1.0587
+      sbert_xgboost                  1.0009
+      sbert_xgboost_noweight         0.9386
+
+--- Fold 3/5: train=3376, val=780, test=1039
+
+⚖️  Sample Weights (Class Balancing):
+   Low          (1-4): n= 374, weight=4.70x
+   Medium       (4-6): n=1758, weight=1.00x
+   Good         (6-8): n=1089, weight=1.61x
+   Excellent    (8-10): n= 155, weight=11.34x
+   Running baseline: predict_mean ...
+   Running baseline: ols_metadata ...
+   Running baseline: ols_structural ...
+   Running baseline: tfidf_xgboost ...
+   Fold 3 test RMSE:
+      predict_mean                   1.3913
+      ols_metadata                   1.0810
+      ols_structural                 1.0362
+      tfidf_xgboost                  1.0681
+      sbert_xgboost                  0.9564
+      sbert_xgboost_noweight         0.9314
+
+--- Fold 4/5: train=3376, val=780, test=1039
+
+⚖️  Sample Weights (Class Balancing):
+   Low          (1-4): n= 351, weight=5.15x
+   Medium       (4-6): n=1806, weight=1.00x
+   Good         (6-8): n=1076, weight=1.68x
+   Excellent    (8-10): n= 143, weight=12.63x
+   Running baseline: predict_mean ...
+   Running baseline: ols_metadata ...
+   Running baseline: ols_structural ...
+   Running baseline: tfidf_xgboost ...
+   Fold 4 test RMSE:
+      predict_mean                   1.5025
+      ols_metadata                   1.1701
+      ols_structural                 1.1164
+      tfidf_xgboost                  1.1242
+      sbert_xgboost                  1.0125
+      sbert_xgboost_noweight         1.0044
+
+--- Fold 5/5: train=3376, val=780, test=1039
+
+⚖️  Sample Weights (Class Balancing):
+   Low          (1-4): n= 376, weight=4.62x
+   Medium       (4-6): n=1738, weight=1.00x
+   Good         (6-8): n=1116, weight=1.56x
+   Excellent    (8-10): n= 146, weight=11.90x
+   Running baseline: predict_mean ...
+   Running baseline: ols_metadata ...
+   Running baseline: ols_structural ...
+   Running baseline: tfidf_xgboost ...
+   Fold 5 test RMSE:
+      predict_mean                   1.3852
+      ols_metadata                   1.0832
+      ols_structural                 1.0443
+      tfidf_xgboost                  1.0489
+      sbert_xgboost                  0.9993
+      sbert_xgboost_noweight         0.9359
+
+----------------------------------------------------------------------
+  CV SUMMARY (mean ± std across 5 folds)
+----------------------------------------------------------------------
+
+  predict_mean
+    RMSE: 1.4380 ± 0.0561  (folds: 1.4932, 1.4176, 1.3913, 1.5025, 1.3852)
+    MAE:  1.1749 ± 0.0566
+    R2:   -0.0001 ± 0.0001
+
+  ols_metadata
+    RMSE: 1.1302 ± 0.0465  (folds: 1.1788, 1.1382, 1.0810, 1.1701, 1.0832)
+    MAE:  0.8829 ± 0.0417
+    R2:   0.3821 ± 0.0167
+
+  ols_structural
+    RMSE: 1.0763 ± 0.0395  (folds: 1.1197, 1.0649, 1.0362, 1.1164, 1.0443)
+    MAE:  0.8328 ± 0.0313
+    R2:   0.4396 ± 0.0068
+
+  tfidf_xgboost
+    RMSE: 1.0829 ± 0.0341  (folds: 1.1143, 1.0587, 1.0681, 1.1242, 1.0489)
+    MAE:  0.8192 ± 0.0220
+    R2:   0.4325 ± 0.0140
+
+  sbert_xgboost
+    RMSE: 0.9999 ± 0.0273  (folds: 1.0304, 1.0009, 0.9564, 1.0125, 0.9993)
+    MAE:  0.7678 ± 0.0243
+    R2:   0.5156 ± 0.0256
+
+  sbert_xgboost_noweight
+    RMSE: 0.9583 ± 0.0327  (folds: 0.9814, 0.9386, 0.9314, 1.0044, 0.9359)
+    MAE:  0.7197 ± 0.0268
+    R2:   0.5556 ± 0.0094
+
+----------------------------------------------------------------------
+  PAIRED SIGNIFICANCE vs SBERT+XGBoost (pooled across folds)
+----------------------------------------------------------------------
+
+  predict_mean vs sbert_xgboost
+    delta_MAE = +0.4070  (95% CI [+0.3835, +0.4293])
+    Wilcoxon p = 9.34e-212
+    Winner: SBERT
+
+  ols_metadata vs sbert_xgboost
+    delta_MAE = +0.1150  (95% CI [+0.1004, +0.1303])
+    Wilcoxon p = 6.74e-37
+    Winner: SBERT
+
+  ols_structural vs sbert_xgboost
+    delta_MAE = +0.0649  (95% CI [+0.0526, +0.0783])
+    Wilcoxon p = 9.83e-16
+    Winner: SBERT
+
+  tfidf_xgboost vs sbert_xgboost
+    delta_MAE = +0.0514  (95% CI [+0.0344, +0.0674])
+    Wilcoxon p = 2.61e-05
+    Winner: SBERT
+
+  sbert_xgboost_noweight vs sbert_xgboost
+    delta_MAE = -0.0482  (95% CI [-0.0572, -0.0391])
+    Wilcoxon p = 2.50e-26
+    Winner: sbert_xgboost_noweight
+
+----------------------------------------------------------------------
+  SAVING ARTIFACTS
+----------------------------------------------------------------------
+   Saved results\cv_table.json
+   Saved results\cv_table.md
+
+======================================================================
+  DONE
+======================================================================

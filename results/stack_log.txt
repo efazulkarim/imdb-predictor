@@ -1,0 +1,59 @@
+======================================================================
+  STACKED ENSEMBLE (Ridge over base models, 5-fold outer CV)
+======================================================================
+======================================================================
+  LOADING DATASET
+======================================================================
+
+>> Loading from single Excel file:
+   [OK] movie_lengths.xlsx: 5204 records (Ratings: 1.5-9.3)
+
+[OK] No duplicates found - all 5204 records are unique
+
+>> Combined dataset: 5204 unique records
+   Columns (8 total): Movie name, Year, IMDb Rating, IMDb ID, .txt Files, Collected By, Decade, Movie length
+   [OK] All expected columns present
+   Rating range: 1.5 - 9.3 (mean: 5.98)
+   Note: Scripts not found will be skipped automatically
+
+>> Loading scripts from: scripts/
+   Processing.......... Done!
+
+>> Loading Summary:
+   [OK] Successfully loaded: 5195 scripts
+   [X] Skipped: 9 total
+      - Missing files: 0
+      - Too short (<1KB): 9
+      - Invalid rating: 0
+      - Read errors: 0
+
+Loaded 5195 scripts.
+   [cache] loaded all-MiniLM-L6-v2 / mean from results/sbert_embeddings_all-MiniLM-L6-v2_mean.npz
+Embeddings shape: (5195, 384)
+
+--- Outer fold 1/5: train=4156, test=1039
+   stacked (this fold): RMSE=0.9622  R2=0.5848  meta_coefs={'ols_metadata': 0.25, 'ols_structural': -0.123, 'tfidf_xgboost': 0.379, 'sbert_xgboost': 0.699}
+--- Outer fold 2/5: train=4156, test=1039
+   stacked (this fold): RMSE=0.9161  R2=0.5824  meta_coefs={'ols_metadata': 0.249, 'ols_structural': -0.112, 'tfidf_xgboost': 0.361, 'sbert_xgboost': 0.696}
+--- Outer fold 3/5: train=4156, test=1039
+   stacked (this fold): RMSE=0.9017  R2=0.5799  meta_coefs={'ols_metadata': 0.264, 'ols_structural': -0.138, 'tfidf_xgboost': 0.374, 'sbert_xgboost': 0.698}
+--- Outer fold 4/5: train=4156, test=1039
+   stacked (this fold): RMSE=0.9763  R2=0.5777  meta_coefs={'ols_metadata': 0.309, 'ols_structural': -0.166, 'tfidf_xgboost': 0.403, 'sbert_xgboost': 0.673}
+--- Outer fold 5/5: train=4156, test=1039
+   stacked (this fold): RMSE=0.9181  R2=0.5606  meta_coefs={'ols_metadata': 0.286, 'ols_structural': -0.142, 'tfidf_xgboost': 0.418, 'sbert_xgboost': 0.666}
+
+======================================================================
+  CV SUMMARY (mean ± std across 5 outer folds)
+======================================================================
+  ols_metadata       RMSE=1.1304±0.0467  MAE=0.8828±0.0418  R2=0.3819±0.0155
+  ols_structural     RMSE=1.0761±0.0401  MAE=0.8322±0.0317  R2=0.4399±0.0073
+  tfidf_xgboost      RMSE=1.0546±0.0350  MAE=0.7895±0.0282  R2=0.4618±0.0139
+  sbert_xgboost      RMSE=0.9557±0.0342  MAE=0.7190±0.0279  R2=0.5580±0.0128
+  stacked            RMSE=0.9349±0.0324  MAE=0.7055±0.0276  R2=0.5771±0.0096
+
+  stacked vs sbert_xgboost (pooled, n=5195):
+    delta_MAE = +0.0134  95% CI [+0.0083, +0.0187]
+    Wilcoxon p = 4.17e-06
+    Winner: stacked
+
+  Saved results/stacking_results.json

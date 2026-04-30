@@ -1,0 +1,44 @@
+======================================================================
+  EXPERIMENT RUNNER  (5-fold cross-validation)
+  SBERT model: all-mpnet-base-v2
+======================================================================
+======================================================================
+  LOADING DATASET
+======================================================================
+
+>> Loading from single Excel file:
+   [OK] movie_lengths.xlsx: 5204 records (Ratings: 1.5-9.3)
+
+[OK] No duplicates found - all 5204 records are unique
+
+>> Combined dataset: 5204 unique records
+   Columns (8 total): Movie name, Year, IMDb Rating, IMDb ID, .txt Files, Collected By, Decade, Movie length
+   [OK] All expected columns present
+   Rating range: 1.5 - 9.3 (mean: 5.98)
+   Note: Scripts not found will be skipped automatically
+
+>> Loading scripts from: scripts/
+   Processing.......... Done!
+
+>> Loading Summary:
+   [OK] Successfully loaded: 5195 scripts
+   [X] Skipped: 9 total
+      - Missing files: 0
+      - Too short (<1KB): 9
+      - Invalid rating: 0
+      - Read errors: 0
+
+Loaded 5195 scripts.
+
+----------------------------------------------------------------------
+  SBERT EMBEDDINGS (one set per pooling strategy)
+----------------------------------------------------------------------
+   Loading SBERT model 'all-mpnet-base-v2' for poolings=['mean', 'max', 'mean_max']...
+C:\Users\salma\Desktop\Research Methodology\imdb-predictor\.venv\Lib\site-packages\huggingface_hub\file_download.py:143: UserWarning: `huggingface_hub` cache-system uses symlinks by default to efficiently store duplicated files but your machine does not support them in C:\Users\salma\.cache\huggingface\hub\models--sentence-transformers--all-mpnet-base-v2. Caching files will still work but in a degraded version that might require more space on your disk. This warning can be disabled by setting the `HF_HUB_DISABLE_SYMLINKS_WARNING` environment variable. For more details, see https://huggingface.co/docs/huggingface_hub/how-to-cache#limitations.
+To support symlinks on Windows, you either need to activate Developer Mode or to run Python as an administrator. In order to activate developer mode, see this article: https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development
+  warnings.warn(message)
+Xet Storage is enabled for this repo, but the 'hf_xet' package is not installed. Falling back to regular HTTP download. For better performance, install the package with: `pip install huggingface_hub[hf_xet]` or `pip install hf_xet`
+   Embedding 5195 scripts in a single pass over 3 pooling strategies...
+   Embedding progress: 500/5195 scripts (pool=mean+max+mean_max)...
+   Embedding progress: 1000/5195 scripts (pool=mean+max+mean_max)...
+   Embedding progress: 1500/5195 scripts (pool=mean+max+mean_max)...
