@@ -83,6 +83,8 @@ TABLE I. Bucketed Rating Counts (n = 5,195)
 
 Mean 5.98, median 5.80, std 1.44, IQR 5.30–7.40.
 
+![**Fig. 3.** Empirical rating distribution. Structural gaps in the (4.3, 5.0) and (6.0, 7.0) intervals: zero records in either. Bimodality is an artifact of IMSDb editorial curation, not a property of the underlying IMDb population.](../figures/01_rating_distribution.png)
+
 **Sampling artifact (important caveat).** Enumerating every unique rating value in the dataset reveals **structural gaps**: zero records in [4.3, 5.0) and zero records in [6.0, 7.0). Together these intervals cover ≈ 17 % of typical IMDb rating mass. We attribute this to selection effects upstream of our control: the IMSDb collection is editorially curated, producing a corpus that is **bimodal by construction**. All metrics in this paper should be interpreted as conditional on IMSDb-style films, not arbitrary IMDb films.
 
 **Temporal coverage and confound.** Mean rating decreases monotonically with release decade (1930s mean 7.49 → 2010s mean 5.48; Spearman ρ ≈ −0.93 over decade midpoints). We attribute this to survivorship bias — only canonical older films appear in IMSDb — combined with the modern sample being large enough to cover the full quality spectrum. Any model with access to `Year` or `Decade` features can exploit this calendar confound; we therefore present a metadata-only OLS baseline in §V to quantify the share of rating variance that this confound alone explains.
@@ -93,19 +95,73 @@ Mean 5.98, median 5.80, std 1.44, IQR 5.30–7.40.
 
 **Preprocessing.** For each raw screenplay we produce two text variants: an aggressive `clean_text` (lowercased, stage directions, character cues, INT./EXT. markers, timestamps, scene numbers, and most punctuation removed) used as input to TF-IDF and structural-feature extraction; and a light `clean_text_for_sbert` that preserves case, punctuation, and paragraph structure (these properties are part of SBERT's pretraining surface and are degraded by aggressive normalization).
 
-**Hand-crafted structural features (n = 19).** Length / volume (`char_count`, `word_count`, `line_count`, `sentence_count`); vocabulary complexity (`avg_word_length`, `unique_word_ratio`, `long_word_ratio`); sentence structure (`avg_sentence_length`, `sentence_length_std`); dialogue (`dialogue_density`, `unique_characters`); emotional indicators (`exclamation_ratio`, `question_ratio`); action/structure (`action_density`, `scene_count`, `words_per_scene`); metadata (`year`, `decade_encoded`, `movie_length`). Missing values are imputed with the training-set median; features are standardized to zero mean and unit variance via a `StandardScaler` fit on the training fold only.
+**Hand-crafted structural features (n = 19).** Length / volume (`char_count`, `word_count`, `line_count`, `sentence_count`); vocabulary complexity (`avg_word_length`, `unique_word_ratio`, `long_word_ratio`); sentence structure (`avg_sentence_length`, `sentence_length_std`); dialogue (`dialogue_density`, `unique_characters`); emotional indicators (`exclamation_ratio`, `question_ratio`); action/structure (`action_density`, `scene_count`, `words_per_scene`); metadata (`year`, `decade_encoded`, `movie_length`). Missing values are imputed with the training-set median $\tilde{x}_j$; each feature $j$ is standardized as
 
-**SBERT encoding with chunking.** We use `all-MiniLM-L6-v2` [2], which produces 384-dim document embeddings. To handle screenplays exceeding SBERT's 256-token context window, each document is chunked into 256-word windows with a 50-word overlap; per-chunk embeddings are mean-pooled to a single 384-dim document embedding. Per-document embeddings are computed once for the corpus and cached on disk, keyed by `(model_name, n_scripts, chunk_size, overlap, pooling, preprocessing_version)`; subsequent experiments reuse the cache.
+$$z_{ij} = \frac{x_{ij} - \mu_j^{\text{train}}}{\sigma_j^{\text{train}}}, \tag{1}$$
 
-**Main system.** The main predictor concatenates the 384-dim SBERT embedding with the standardized 19-dim feature vector, producing a 403-dim input fed to an XGBoost regressor (`max_depth=6`, `learning_rate=0.05`, `reg_alpha=0.1`, `reg_lambda=1.0`, `tree_method=hist`, `n_estimators=1000` capped by `early_stopping_rounds=20` on a held-out validation split). We do **not** use inverse-frequency sample weights; the ablation in §V shows they degrade performance.
+with $\mu_j^{\text{train}}, \sigma_j^{\text{train}}$ computed on the training fold only.
 
-**Baselines.** (1) `predict_mean`: constant-mean predictor — the floor. (2) `ols_metadata`: OLS on `[year, decade_encoded, movie_length]` only. (3) `ols_structural`: OLS on the full 19-dim structural feature vector. (4) `tfidf_xgboost`: TF-IDF (top 8,000 1- and 2-grams, `min_df=3`, `max_df=0.85`, sublinear TF) + XGBoost. All baselines train and evaluate on the same train/val/test splits as the main system; predictions are clipped to [1, 10].
+**SBERT encoding with chunking.** We use `all-MiniLM-L6-v2` [2], which produces 384-dim document embeddings. To handle screenplays exceeding SBERT's 256-token context window, each document $d$ of $W_d$ words is split into overlapping chunks $c_1, \dots, c_{K_d}$ of length $L=256$ words with overlap $O=50$, giving stride $s=L-O=206$ and chunk count
 
-**Stacked ensemble.** A Ridge meta-regressor (`alpha=1.0`) is fit over the four base models' predictions using nested cross-validation: an outer 5-fold KFold partitions the corpus into disjoint test folds; within each outer training portion, an inner 5-fold KFold produces *out-of-fold* base-model predictions on which the meta-regressor is trained; the base models are then refit on the full outer training set and evaluated on the outer test fold via the trained meta-regressor.
+$$K_d = \max\!\left(1, \left\lceil \frac{W_d - L}{s} \right\rceil + 1\right). \tag{2}$$
+
+Each chunk is embedded to $e_k \in \mathbb{R}^{384}$; the document representation is the chunk mean,
+
+$$\bar{e}_d = \frac{1}{K_d} \sum_{k=1}^{K_d} e_k. \tag{3}$$
+
+Per-document embeddings are cached on disk keyed by `(model_name, n_scripts, chunk_size, overlap, pooling, preprocessing_version)`. Fig. 1 summarizes the full pipeline.
+
+![**Fig. 1.** Base predictor pipeline. Raw screenplay → light cleaning → 256-word chunks (50-word overlap) → SBERT encoder → mean-pool → concat with 19 standardized structural features → XGBoost regressor with early stopping.](../figures/06_pipeline.png)
+
+**Main system.** For each document $d$ we form the joint feature vector
+
+$$\mathbf{x}_d = [\, \bar{e}_d \,;\, \mathbf{z}_d \,] \in \mathbb{R}^{403}, \tag{4}$$
+
+i.e. concatenation of the 384-d SBERT vector and the 19-d standardized feature vector. An XGBoost regressor with $T$ additive trees produces
+
+$$\hat{y}_d = \mathrm{clip}_{[1,10]}\!\left(\sum_{t=1}^T f_t(\mathbf{x}_d)\right),\quad f_t \in \mathcal{F}, \tag{5}$$
+
+where $\mathcal{F}$ is the space of regression trees. Each tree minimizes the regularized squared-error objective
+
+$$\mathcal{L}(\theta) = \sum_d (y_d - \hat{y}_d)^2 + \gamma T + \tfrac{1}{2}\lambda \lVert w \rVert_2^2 + \alpha \lVert w \rVert_1, \tag{6}$$
+
+with leaf-weight regularizers $\lambda$ ($L_2$) and $\alpha$ ($L_1$) and tree-complexity penalty $\gamma$. Hyperparameters: `max_depth=6`, `learning_rate=0.05`, `reg_alpha=0.1`, `reg_lambda=1.0`, `tree_method=hist`, `n_estimators=1000` capped by `early_stopping_rounds=20` on a held-out validation split. We do **not** use inverse-frequency sample weights; the ablation in §V shows they degrade performance.
+
+**Baselines.** (1) `predict_mean`: constant-mean predictor — the floor. (2) `ols_metadata`: OLS on `[year, decade_encoded, movie_length]` only. (3) `ols_structural`: OLS on the full 19-dim structural feature vector. (4) `tfidf_xgboost`: TF-IDF (top 8,000 1- and 2-grams, `min_df=3`, `max_df=0.85`, sublinear TF) + XGBoost. TF-IDF weights term $t$ in document $d$ as
+
+$$\mathrm{tfidf}(t, d) = (1 + \log f_{t,d}) \cdot \log \frac{N}{n_t}, \tag{7}$$
+
+with term frequency $f_{t,d}$, corpus size $N$, document frequency $n_t$. All baselines train and evaluate on the same splits; predictions are clipped to [1, 10].
+
+**(Legacy) inverse-frequency sample weights.** For the ablation in §V, each training sample $i$ in rating bucket $c(i)$ would receive weight
+
+$$w_i = \frac{\max_c N_c}{N_{c(i)}}, \tag{8}$$
+
+where $N_c$ is the training-set count of bucket $c$. On our training fold this yields $w \in \{5.25, 1.00, 1.66, 13.24\}$ for {Low, Med, Good, Exc}.
+
+**Stacked ensemble.** A Ridge meta-regressor is fit over the four base models' predictions using nested cross-validation: an outer 5-fold KFold partitions the corpus into disjoint test folds; within each outer training portion, an inner 5-fold KFold produces *out-of-fold* base-model predictions on which the meta-regressor is trained; the base models are then refit on the full outer training set and evaluated on the outer test fold via the trained meta-regressor. Let $M$ index the base models and $\hat{y}_d^{(m)}$ be the prediction of model $m$ for document $d$. The stacked prediction is
+
+$$\hat{y}_d^{\text{stack}} = \mathrm{clip}_{[1,10]}\!\left(b + \sum_{m \in M} w_m\, \hat{y}_d^{(m)}\right), \tag{9}$$
+
+with $w_m, b$ chosen to minimize the Ridge objective
+
+$$\min_{w,b}\;\sum_d \Big(y_d - b - \sum_m w_m \hat{y}_d^{(m)}\Big)^2 + \alpha \lVert w \rVert_2^2, \tag{10}$$
+
+at $\alpha = 1.0$. Fig. 2 shows the architecture.
+
+![**Fig. 2.** Stacked ensemble architecture. Four base models produce out-of-fold predictions on the inner-CV split; the Ridge meta-regressor maps these meta features to $\hat{y}_{\text{stack}}$.](../figures/07_stacking.png)
 
 **Hyperparameter search.** We additionally run a 100-trial Optuna [TPE] search over the XGBoost head's hyperparameter space (learning rate, depth, min child weight, subsample, column-subsample, $L_1$/$L_2$ regularization, gamma) with `early_stopping_rounds=30` on a fixed train/val split internal to the training partition.
 
-**Splits and statistical protocol.** Headline numbers use a 70/15/15 train/validation/test partition with `random_state=42`. Robustness numbers use 5-fold cross-validation. We report bootstrap 95% confidence intervals on RMSE/MAE/R² (1,000 resamples). For comparisons against the main system on the same test samples, we additionally report a paired-bootstrap 95% CI for ΔMAE and a paired Wilcoxon signed-rank test on per-sample absolute errors.
+**Splits and statistical protocol.** Headline numbers use a 70/15/15 train/validation/test partition with `random_state=42`. Robustness numbers use 5-fold cross-validation. Metrics on $n$ test samples:
+
+$$\mathrm{RMSE} = \sqrt{\tfrac{1}{n}\sum_i (y_i - \hat{y}_i)^2},\;\; \mathrm{MAE} = \tfrac{1}{n}\sum_i |y_i - \hat{y}_i|,\;\; R^2 = 1 - \frac{\sum_i (y_i - \hat{y}_i)^2}{\sum_i (y_i - \bar{y})^2}. \tag{11}$$
+
+Bootstrap 95% CIs are computed by resampling test indices $B = 1{,}000$ times with replacement and reporting empirical quantiles $[Q_{0.025}, Q_{0.975}]$. For paired comparison on the same test samples we report the Wilcoxon signed-rank statistic on per-sample absolute-error differences $\delta_i = |y_i - \hat{y}_i^A| - |y_i - \hat{y}_i^B|$,
+
+$$W = \sum_{i:\, \delta_i \neq 0} \mathrm{sgn}(\delta_i) \cdot R_i, \tag{12}$$
+
+with $R_i$ the rank of $|\delta_i|$ among non-zero $|\delta|$. We report the two-sided $p$-value plus a paired-bootstrap 95% CI for ΔMAE.
 
 ---
 
@@ -161,7 +217,13 @@ Pooled paired Wilcoxon stacked vs SBERT: ΔMAE = +0.013 ([+0.008, +0.019]), p = 
 
 **Hyperparameter tuning (Optuna).** A 100-trial TPE search on the XGBoost head improves single-split test R² from 0.568 to 0.581 [0.55, 0.62] (ΔMAE = −0.035). The best configuration uses `learning_rate ≈ 0.011` (5× lower than the hand-picked default), `reg_alpha ≈ 1.0` (10× higher), `max_depth = 5` — directly addressing the overfitting visible in the legacy training curve.
 
-**Per-bucket performance.** Test-set MAE by rating bucket (no-weight SBERT): Low [1, 4) MAE = 1.577 (n = 107); Medium [4, 6) 0.558 (n = 380); Good [6, 8) 0.672 (n = 250); Excellent [8, 10) 0.818 (n = 43). Performance is best on the corpus mode and degrades on both tails — predictions cluster between approximately 4 and 8 even when true ratings span 1.5 to 9.3.
+**Per-bucket performance.** Test-set MAE by rating bucket (no-weight SBERT): Low [1, 4) MAE = 1.577 (n = 107); Medium [4, 6) 0.558 (n = 380); Good [6, 8) 0.672 (n = 250); Excellent [8, 10) 0.818 (n = 43). Performance is best on the corpus mode and degrades on both tails — predictions cluster between approximately 4 and 8 even when true ratings span 1.5 to 9.3 (Fig. 4).
+
+![**Fig. 4.** Actual vs. predicted ratings on the held-out test set (no-weight SBERT, single split). Predicted values concentrate between 4 and 8 — consistent with squared-loss regression on a target with both heavy mass in the middle and structural empty intervals in the (4.3, 5.0) and (6.0, 7.0) rating ranges.](../figures/05_actual_vs_predicted.png)
+
+![**Fig. 5.** XGBoost feature importance (top 20). `movie_length` and `year` dominate; individual SBERT dimensions each contribute less than 0.02 — consistent with the metadata-decomposition result that 70% of R² is recoverable from three metadata features.](../figures/04_feature_importance.png)
+
+![**Fig. 6.** Training and validation RMSE per boosting iteration. Early stopping (Eq. 6) prevents the unconstrained over-fitting visible in the legacy pipeline (training RMSE approached 0.03 while validation plateaued near 0.97).](../figures/02_training_validation_loss.png)
 
 ---
 

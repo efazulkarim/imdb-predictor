@@ -249,6 +249,16 @@ Excellent $[8, 10)$ & $228$  & $4.4$ \\
 
 Mean $5.98$, median $5.80$, std $1.44$, IQR $5.30$--$7.40$.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{../figures/01_rating_distribution.png}
+\caption{Empirical rating distribution. Structural gaps in the
+$[4.3, 5.0)$ and $[6.0, 7.0)$ intervals: zero records in either.
+The bimodality is an artifact of IMSDb editorial curation rather
+than a property of the underlying IMDb population.}
+\label{fig:ratings}
+\end{figure}
+
 \textbf{Sampling artifact (important caveat).}
 Enumerating every unique rating value in the dataset reveals
 \emph{structural gaps}: zero records in $[4.3, 5.0)$ and zero
@@ -299,32 +309,90 @@ emotional indicators (\texttt{exclamation\_ratio},
 (\texttt{action\_density}, \texttt{scene\_count},
 \texttt{words\_per\_scene}); metadata (\texttt{year},
 \texttt{decade\_encoded}, \texttt{movie\_length}). Missing values
-are imputed with the training-set median; features are standardized
-to zero mean and unit variance via a \texttt{StandardScaler} fit on
-the training fold only.
+are imputed with the training-set median $\tilde{x}_{j}$; each
+feature $j$ is then standardized as
+
+\begin{equation}
+z_{ij} \;=\; \frac{x_{ij} - \mu_{j}^{\text{train}}}{\sigma_{j}^{\text{train}}},
+\label{eq:zscore}
+\end{equation}
+
+where $\mu_{j}^{\text{train}}$ and $\sigma_{j}^{\text{train}}$ are
+computed on the training fold only.
 
 \textbf{SBERT encoding with chunking.}
 We use \texttt{all-MiniLM-L6-v2}~\cite{ref2}, which produces
 $384$-dim document embeddings. To handle screenplays exceeding
-SBERT's $256$-token context window, each document is chunked into
-$256$-word windows with a $50$-word overlap; per-chunk embeddings
-are mean-pooled to a single $384$-dim document embedding.
+SBERT's $256$-token context window, each document $d$ of $W_{d}$
+words is split into overlapping chunks $c_{1}, \dots, c_{K_{d}}$ of
+length $L = 256$ words with overlap $O = 50$, giving stride
+$s = L - O = 206$ and chunk count
+
+\begin{equation}
+K_{d} \;=\; \max\!\left(1,\; \left\lceil \frac{W_{d} - L}{s} \right\rceil + 1\right).
+\label{eq:chunkcount}
+\end{equation}
+
+Each chunk is embedded by SBERT to $e_{k} \in \mathbb{R}^{384}$;
+the per-document representation is the mean of the chunk embeddings,
+
+\begin{equation}
+\bar{e}_{d} \;=\; \frac{1}{K_{d}} \sum_{k=1}^{K_{d}} e_{k}.
+\label{eq:meanpool}
+\end{equation}
+
 Per-document embeddings are computed once for the corpus and cached
 on disk, keyed by \texttt{(model\_name, n\_scripts, chunk\_size,
 overlap, pooling, preprocessing\_version)}; subsequent experiments
-reuse the cache.
+reuse the cache. Fig.~\ref{fig:pipeline} summarizes the full
+pipeline.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../figures/06_pipeline.png}
+\caption{Base predictor pipeline. The raw screenplay is lightly
+cleaned, chunked into 256-word windows with 50-word overlap, encoded
+by SBERT, mean-pooled to a 384-d vector, concatenated with 19
+standardized structural features, and passed to an XGBoost regressor
+with early stopping.}
+\label{fig:pipeline}
+\end{figure}
 
 \textbf{Main system.}
-The main predictor concatenates the $384$-dim SBERT embedding with
-the standardized $19$-dim feature vector, producing a $403$-dim
-input fed to an XGBoost regressor (\texttt{max\_depth=6},
-\texttt{learning\_rate=0.05}, \texttt{reg\_alpha=0.1},
-\texttt{reg\_lambda=1.0}, \texttt{tree\_method=hist},
-\texttt{n\_estimators=1000} capped by
-\texttt{early\_stopping\_rounds=20} on a held-out validation
-split). We do \emph{not} use inverse-frequency sample weights; the
-ablation in Section~\ref{sec:results} shows they degrade
-performance.
+For each document $d$ we form the joint feature vector
+
+\begin{equation}
+\mathbf{x}_{d} \;=\; \left[\, \bar{e}_{d}\;;\; \mathbf{z}_{d} \,\right] \in \mathbb{R}^{403},
+\label{eq:concat}
+\end{equation}
+
+i.e.\ concatenation of the 384-d SBERT vector and the 19-d
+standardized structural feature vector. An XGBoost regressor with
+$T$ additive trees produces
+
+\begin{equation}
+\hat{y}_{d} \;=\; \mathrm{clip}_{[1,10]}\!\left(\sum_{t=1}^{T} f_{t}(\mathbf{x}_{d})\right),\quad f_{t} \in \mathcal{F},
+\label{eq:xgb-pred}
+\end{equation}
+
+where $\mathcal{F}$ is the space of regression trees. Each tree is
+fit to minimize the regularized squared-error objective
+
+\begin{equation}
+\mathcal{L}(\theta) \;=\; \sum_{d} \big(y_{d} - \hat{y}_{d}\big)^{2}
+                       \;+\; \gamma\, T \;+\; \tfrac{1}{2}\lambda \|w\|_{2}^{2}
+                       \;+\; \alpha \|w\|_{1},
+\label{eq:xgb-loss}
+\end{equation}
+
+with leaf-weight regularizers $\lambda$ ($L_{2}$) and $\alpha$
+($L_{1}$) and tree-complexity penalty $\gamma$. Hyperparameters:
+\texttt{max\_depth=6}, \texttt{learning\_rate=0.05},
+\texttt{reg\_alpha=0.1}, \texttt{reg\_lambda=1.0},
+\texttt{tree\_method=hist}, \texttt{n\_estimators=1000} capped by
+\texttt{early\_stopping\_rounds=20} on a held-out validation split.
+We do \emph{not} use inverse-frequency sample weights; the ablation
+in Section~\ref{sec:results} shows they degrade performance.
 
 \textbf{Baselines.}
 (1)~\texttt{predict\_mean}: constant-mean predictor -- the floor.
@@ -335,19 +403,70 @@ only.
 feature vector.
 (4)~\texttt{tfidf\_xgboost}: TF-IDF (top $8{,}000$ uni- and
 bigrams, \texttt{min\_df=3}, \texttt{max\_df=0.85}, sublinear TF) +
-XGBoost. All baselines train and evaluate on the same
-train/val/test splits as the main system; predictions are clipped
-to $[1, 10]$.
+XGBoost. TF-IDF assigns to term $t$ in document $d$ the weight
+
+\begin{equation}
+\mathrm{tfidf}(t, d) \;=\; \big(1 + \log f_{t,d}\big)\cdot \log\!\frac{N}{n_{t}},
+\label{eq:tfidf}
+\end{equation}
+
+where $f_{t,d}$ is the term frequency, $N$ the corpus size, and
+$n_{t}$ the document frequency of $t$. All baselines train and
+evaluate on the same train/val/test splits as the main system;
+predictions are clipped to $[1, 10]$.
+
+\textbf{(Legacy) inverse-frequency sample weights.}
+For the ablation in Section~\ref{sec:results}, each training sample
+$i$ in rating bucket $c(i) \in \{\text{Low, Med, Good, Exc}\}$ would
+receive weight
+
+\begin{equation}
+w_{i} \;=\; \frac{\max_{c} N_{c}}{N_{c(i)}},
+\label{eq:weights}
+\end{equation}
+
+where $N_{c}$ is the training-set count of bucket $c$. On our
+training fold this yields $w \in \{5.25, 1.00, 1.66, 13.24\}$ for
+$\{$Low, Med, Good, Exc$\}$.
 
 \textbf{Stacked ensemble.}
-A Ridge meta-regressor (\texttt{alpha=1.0}) is fit over the four
-base models' predictions using nested cross-validation: an outer
-$5$-fold KFold partitions the corpus into disjoint test folds;
-within each outer training portion, an inner $5$-fold KFold
-produces \emph{out-of-fold} base-model predictions on which the
+A Ridge meta-regressor is fit over the four base models'
+predictions using nested cross-validation: an outer $5$-fold KFold
+partitions the corpus into disjoint test folds; within each outer
+training portion, an inner $5$-fold KFold produces
+\emph{out-of-fold} base-model predictions on which the
 meta-regressor is trained; the base models are then refit on the
 full outer training set and evaluated on the outer test fold via
-the trained meta-regressor.
+the trained meta-regressor. Let $M$ index the base models and
+$\hat{y}_{d}^{(m)}$ be the prediction of model $m$ for document
+$d$. The stacked prediction is
+
+\begin{equation}
+\hat{y}_{d}^{\text{stack}}
+\;=\; \mathrm{clip}_{[1,10]}\!\left( b \;+\; \sum_{m \in M} w_{m}\, \hat{y}_{d}^{(m)} \right),
+\label{eq:stack}
+\end{equation}
+
+with weights $w_{m}$ and bias $b$ chosen to minimize the Ridge
+objective
+
+\begin{equation}
+\min_{w, b}\;
+\sum_{d}\Big(y_{d} - b - \sum_{m} w_{m}\hat{y}_{d}^{(m)}\Big)^{2}
+\;+\; \alpha \|w\|_{2}^{2},
+\label{eq:ridge}
+\end{equation}
+
+at $\alpha = 1.0$. Fig.~\ref{fig:stacking} shows the architecture.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../figures/07_stacking.png}
+\caption{Stacked ensemble architecture. Four base models produce
+out-of-fold predictions on the inner-CV split; the Ridge
+meta-regressor maps these meta features to $\hat{y}_{\text{stack}}$.}
+\label{fig:stacking}
+\end{figure}
 
 \textbf{Hyperparameter search.}
 We additionally run a $100$-trial Optuna TPE search over the
@@ -359,12 +478,38 @@ a fixed train/val split internal to the training partition.
 \textbf{Splits and statistical protocol.}
 Headline numbers use a $70$/$15$/$15$ train/validation/test
 partition with \texttt{random\_state=42}. Robustness numbers use
-$5$-fold cross-validation. We report bootstrap $95\%$ confidence
-intervals on RMSE/MAE/$R^{2}$ ($1{,}000$ resamples). For
-comparisons against the main system on the same test samples, we
-additionally report a paired-bootstrap $95\%$ CI for
-$\Delta\text{MAE}$ and a paired Wilcoxon signed-rank test on
-per-sample absolute errors.
+$5$-fold cross-validation. Metrics are reported on the $n$ test
+samples as
+
+\begin{align}
+\mathrm{RMSE} &= \sqrt{\tfrac{1}{n}\textstyle\sum_{i}(y_{i} - \hat{y}_{i})^{2}}, \label{eq:rmse}\\
+\mathrm{MAE}  &= \tfrac{1}{n}\textstyle\sum_{i} \lvert y_{i} - \hat{y}_{i} \rvert, \label{eq:mae}\\
+R^{2}         &= 1 - \dfrac{\sum_{i}(y_{i} - \hat{y}_{i})^{2}}{\sum_{i}(y_{i} - \bar{y})^{2}}. \label{eq:r2}
+\end{align}
+
+Bootstrap $95\%$ CIs are computed by resampling test indices
+$B = 1{,}000$ times with replacement and reporting empirical
+quantiles
+
+\begin{equation}
+\mathrm{CI}_{0.95}(\theta) \;=\; \big[\, Q_{0.025}(\theta^{(1{:}B)}),\; Q_{0.975}(\theta^{(1{:}B)}) \,\big].
+\label{eq:bootstrap}
+\end{equation}
+
+For comparing model $A$ against model $B$ on the same test samples
+we report the paired Wilcoxon signed-rank statistic on per-sample
+absolute-error differences
+$\delta_{i} = \lvert y_{i} - \hat{y}_{i}^{A}\rvert - \lvert y_{i} - \hat{y}_{i}^{B}\rvert$,
+
+\begin{equation}
+W \;=\; \sum_{i:\, \delta_{i} \ne 0} \mathrm{sgn}(\delta_{i})\cdot R_{i},
+\label{eq:wilcoxon}
+\end{equation}
+
+where $R_{i}$ is the rank of $\lvert \delta_{i} \rvert$ among the
+non-zero $\lvert \delta \rvert$. We report the two-sided
+$p$-value; a paired-bootstrap $95\%$ CI is additionally given for
+$\Delta\text{MAE}$.
 
 % =============================================================
 %  V.  RESULTS
@@ -504,7 +649,39 @@ Good $[6, 8)$ $0.672$ ($n = 250$);
 Excellent $[8, 10)$ $0.818$ ($n = 43$). Performance is best on the
 corpus mode and degrades on both tails -- predictions cluster
 between approximately $4$ and $8$ even when true ratings span
-$1.5$ to $9.3$.
+$1.5$ to $9.3$ (Fig.~\ref{fig:scatter}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.78\linewidth]{../figures/05_actual_vs_predicted.png}
+\caption{Actual vs.\ predicted ratings on the held-out test set
+(no-weight SBERT, single-split). Predicted values concentrate
+between $4$ and $8$ -- consistent with squared-loss regression on a
+target with both heavy mass in the middle and structural empty
+intervals in $[4.3, 5.0)$ and $[6.0, 7.0)$.}
+\label{fig:scatter}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{../figures/04_feature_importance.png}
+\caption{XGBoost feature importance (top $20$).
+\texttt{movie\_length} and \texttt{year} dominate; individual SBERT
+dimensions each contribute less than $0.02$ -- consistent with the
+metadata-decomposition result that $70\%$ of $R^{2}$ is recoverable
+from three metadata features.}
+\label{fig:featimp}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.78\linewidth]{../figures/02_training_validation_loss.png}
+\caption{Training and validation RMSE per boosting iteration. The
+early-stopping configuration in~\eqref{eq:xgb-loss} prevents the
+unconstrained over-fitting visible in the legacy pipeline (training
+RMSE approached $0.03$ while validation plateaued near $0.97$).}
+\label{fig:trainval}
+\end{figure}
 
 % =============================================================
 %  VI.  DISCUSSION
