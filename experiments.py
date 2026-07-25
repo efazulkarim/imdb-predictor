@@ -233,10 +233,57 @@ def run_sbert_xgboost(
     }
 
 
+def run_sbert_other_models(
+    embeddings, features_df, y, idx_train, idx_val, idx_test,
+    model_type='lightgbm', random_state=RANDOM_STATE,
+):
+    """
+    Run alternative regressors (LightGBM, Random Forest, SVR, MLP) on top of
+    SBERT embeddings + structural features.
+    """
+    X_emb_train = embeddings[idx_train]
+    X_emb_val = embeddings[idx_val]
+    X_emb_test = embeddings[idx_test]
+
+    median = features_df.iloc[idx_train].median(numeric_only=True)
+    X_num_train = features_df.iloc[idx_train].fillna(median)
+    X_num_test = features_df.iloc[idx_test].fillna(median)
+
+    scaler = StandardScaler()
+    X_num_train_s = scaler.fit_transform(X_num_train)
+    X_num_test_s = scaler.transform(X_num_test)
+
+    X_train = np.hstack([X_emb_train, X_num_train_s])
+    X_test = np.hstack([X_emb_test, X_num_test_s])
+
+    if model_type == 'lightgbm':
+        from lightgbm import LGBMRegressor
+        model = LGBMRegressor(n_estimators=300, learning_rate=0.05, num_leaves=31, random_state=random_state, verbose=-1)
+    elif model_type == 'rf':
+        from sklearn.ensemble import RandomForestRegressor
+        model = RandomForestRegressor(n_estimators=300, max_depth=12, random_state=random_state, n_jobs=-1)
+    elif model_type == 'svr':
+        from sklearn.svm import SVR
+        model = SVR(kernel='rbf', C=1.0, epsilon=0.1)
+    elif model_type == 'mlp':
+        from sklearn.neural_network import MLPRegressor
+        model = MLPRegressor(hidden_layer_sizes=(128, 64), max_iter=200, random_state=random_state)
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
+
+    model.fit(X_train, y[idx_train])
+    preds_test = np.clip(model.predict(X_test), 1.0, 10.0)
+    return preds_test
+
+
 def _model_order():
     """Canonical row order for the comparison table."""
-    order = ['predict_mean', 'ols_metadata', 'ols_structural',
-             'tfidf_xgboost', 'sbert_xgboost']
+    order = [
+        'predict_mean', 'ols_metadata', 'ols_structural',
+        'tfidf_xgboost', 'glove_xgboost', 'w2v_xgboost',
+        'sbert_svr', 'sbert_mlp', 'sbert_rf', 'sbert_lightgbm',
+        'sbert_xgboost'
+    ]
     for pool in POOLING_STRATEGIES[1:]:
         order.append(f'sbert_xgboost_{pool}')
     order.append('sbert_xgboost_noweight')
@@ -257,8 +304,7 @@ def _run_one_split(
     """
     y_train = ratings[idx_train]
 
-    # Sample weights for the training portion (used by TF-IDF and SBERT systems
-    # for fair comparison with the legacy main pipeline).
+    # Sample weights for the training portion
     sample_weights = compute_sample_weights(y_train)
 
     # Baselines (slice text & feature DF the same way).
@@ -277,6 +323,32 @@ def _run_one_split(
         random_state=random_state,
     )
 
+    # Add GloVe + XGBoost and Word2Vec + XGBoost baselines
+    try:
+        from embeddings import generate_glove_embeddings, generate_word2vec_embeddings
+        glove_emb = generate_glove_embeddings(scripts_text, seed=random_state)
+        w2v_emb = generate_word2vec_embeddings(scripts_text, seed=random_state)
+
+        all_preds['glove_xgboost'] = run_sbert_xgboost(
+            glove_emb, features_df, ratings, idx_train, idx_val, idx_test, random_state=random_state
+        )['test_preds']
+
+        all_preds['w2v_xgboost'] = run_sbert_xgboost(
+            w2v_emb, features_df, ratings, idx_train, idx_val, idx_test, random_state=random_state
+        )['test_preds']
+    except Exception as e:
+        print(f"   [Notice] Could not run GloVe/Word2Vec baselines ({e})")
+
+    # Add SBERT + Other Regressors (SVR, MLP, RF, LightGBM)
+    main_emb = embeddings_by_pool[POOLING_STRATEGIES[0]]
+    for mtype in ['svr', 'mlp', 'rf', 'lightgbm']:
+        try:
+            all_preds[f'sbert_{mtype}'] = run_sbert_other_models(
+                main_emb, features_df, ratings, idx_train, idx_val, idx_test, model_type=mtype, random_state=random_state
+            )
+        except Exception as e:
+            print(f"   [Notice] Could not run sbert_{mtype} ({e})")
+
     # SBERT main system, one variant per pooling strategy.
     for pool in POOLING_STRATEGIES:
         name = f'sbert_xgboost_{pool}' if pool != POOLING_STRATEGIES[0] else 'sbert_xgboost'
@@ -288,8 +360,7 @@ def _run_one_split(
         )
         all_preds[name] = sbert_out['test_preds']
 
-    # Ablation: SBERT (mean pooling) trained WITHOUT sample weights, to
-    # quantify the effect of the rating-bucket reweighting.
+    # Ablation: SBERT (mean pooling) trained WITHOUT sample weights
     sbert_nw = run_sbert_xgboost(
         embeddings_by_pool[POOLING_STRATEGIES[0]], features_df, ratings,
         idx_train, idx_val, idx_test,
