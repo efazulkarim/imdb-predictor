@@ -1,0 +1,246 @@
+{
+  "gain_attribution": {
+    "model": "Gradient Boosting",
+    "n_features": 403,
+    "block_gain": {
+      "sbert_384": 0.5545045905637291,
+      "structural_16": 0.07977520294942554,
+      "metadata_3": 0.36572020648684544
+    },
+    "sbert_dim_stats": {
+      "max": 0.01684488138823788,
+      "mean": 0.0014440223712597112,
+      "top10_sum": 0.06585946499859546
+    },
+    "numeric_feature_gain": {
+      "char_count": 0.024137684298084352,
+      "word_count": 0.015550923051734866,
+      "line_count": 0.00745005694233545,
+      "avg_word_length": 0.0025817271218777685,
+      "unique_word_ratio": 0.0016220902864375192,
+      "long_word_ratio": 0.0008718313971673015,
+      "sentence_count": 0.006582667950683535,
+      "avg_sentence_length": 0.0017262496518095122,
+      "sentence_length_std": 0.0021329071793255053,
+      "dialogue_density": 0.0008981966837512638,
+      "unique_characters": 0.0005065128192932244,
+      "exclamation_ratio": 0.00220755196023282,
+      "question_ratio": 0.00133534437147281,
+      "action_density": 0.0010175226813050246,
+      "scene_count": 0.004671416982285523,
+      "words_per_scene": 0.006482519571629068,
+      "year": 0.11007134381041933,
+      "movie_length": 0.2550275914982246,
+      "decade_encoded": 0.0006212711782014839
+    },
+    "top20_overall": [
+      {
+        "feature": "movie_length",
+        "gain": 0.2550275914982246
+      },
+      {
+        "feature": "year",
+        "gain": 0.11007134381041933
+      },
+      {
+        "feature": "char_count",
+        "gain": 0.024137684298084352
+      },
+      {
+        "feature": "sbert_127",
+        "gain": 0.01684488138823788
+      },
+      {
+        "feature": "word_count",
+        "gain": 0.015550923051734866
+      },
+      {
+        "feature": "sbert_308",
+        "gain": 0.015411489182868878
+      },
+      {
+        "feature": "line_count",
+        "gain": 0.00745005694233545
+      },
+      {
+        "feature": "sentence_count",
+        "gain": 0.006582667950683535
+      },
+      {
+        "feature": "words_per_scene",
+        "gain": 0.006482519571629068
+      },
+      {
+        "feature": "sbert_124",
+        "gain": 0.0049749449252853226
+      },
+      {
+        "feature": "scene_count",
+        "gain": 0.004671416982285523
+      },
+      {
+        "feature": "sbert_57",
+        "gain": 0.004419621880409624
+      },
+      {
+        "feature": "sbert_266",
+        "gain": 0.004147872092289815
+      },
+      {
+        "feature": "sbert_328",
+        "gain": 0.004136504463305516
+      },
+      {
+        "feature": "sbert_296",
+        "gain": 0.004012748966101444
+      },
+      {
+        "feature": "sbert_313",
+        "gain": 0.003979777732323483
+      },
+      {
+        "feature": "sbert_85",
+        "gain": 0.003973709772779278
+      },
+      {
+        "feature": "sbert_49",
+        "gain": 0.003957914594994231
+      },
+      {
+        "feature": "sbert_259",
+        "gain": 0.003835304846487495
+      },
+      {
+        "feature": "sbert_270",
+        "gain": 0.003793298355943764
+      }
+    ],
+    "rank_of_numeric": {
+      "char_count": 3,
+      "word_count": 5,
+      "line_count": 7,
+      "avg_word_length": 39,
+      "unique_word_ratio": 121,
+      "long_word_ratio": 285,
+      "sentence_count": 8,
+      "avg_sentence_length": 103,
+      "sentence_length_std": 63,
+      "dialogue_density": 275,
+      "unique_characters": 377,
+      "exclamation_ratio": 58,
+      "question_ratio": 172,
+      "action_density": 246,
+      "scene_count": 11,
+      "words_per_scene": 9,
+      "year": 2,
+      "movie_length": 1,
+      "decade_encoded": 356
+    }
+  },
+  "block_permutation_chronological": {
+    "baseline_mae": 0.7232082918778207,
+    "sbert_384": {
+      "delta_mae_mean": 0.19501236787351595,
+      "delta_mae_sd": 0.021709731452978928
+    },
+    "year": {
+      "delta_mae_mean": 0.0,
+      "delta_mae_sd": 0.0
+    },
+    "movie_length": {
+      "delta_mae_mean": 0.1988255548893827,
+      "delta_mae_sd": 0.01846602069730901
+    },
+    "decade_encoded": {
+      "delta_mae_mean": 0.0,
+      "delta_mae_sd": 0.0
+    },
+    "metadata_3": {
+      "delta_mae_mean": 0.2168464160521053,
+      "delta_mae_sd": 0.02498791057908912
+    }
+  },
+  "per_year_holdout": {
+    "2020": {
+      "n": 84,
+      "mae": 0.7601758741197132,
+      "bias": -0.03019702661605108,
+      "true_mean": 5.555952380952379,
+      "pred_mean": 5.525755405426025
+    },
+    "2021": {
+      "n": 90,
+      "mae": 0.7064495711856419,
+      "bias": 0.2747179063161215,
+      "true_mean": 5.524444444444445,
+      "pred_mean": 5.799161911010742
+    },
+    "2022": {
+      "n": 94,
+      "mae": 0.7988272058202865,
+      "bias": 0.22680695107642648,
+      "true_mean": 5.8021276595744675,
+      "pred_mean": 6.028934478759766
+    },
+    "2023": {
+      "n": 111,
+      "mae": 0.6408788517788726,
+      "bias": 0.11123592875025291,
+      "true_mean": 5.778378378378378,
+      "pred_mean": 5.889613628387451
+    },
+    "2024": {
+      "n": 90,
+      "mae": 0.7036201318105062,
+      "bias": -0.0017732397715250494,
+      "true_mean": 5.871111111111112,
+      "pred_mean": 5.86933708190918
+    },
+    "2025": {
+      "n": 46,
+      "mae": 0.7709546462349269,
+      "bias": -0.23891884347666856,
+      "true_mean": 6.1847826086956506,
+      "pred_mean": 5.945863723754883
+    }
+  },
+  "calibration_holdout": {
+    "slope": 0.4634396894028458,
+    "intercept": 3.174476213206425,
+    "stderr": 0.027841969944924178,
+    "r": 0.5921899058041865,
+    "p": 4.643162894241635e-50,
+    "sd_true": 1.1700516938753278,
+    "sd_pred": 0.915666401386261,
+    "dispersion_ratio": 0.7825862790330935,
+    "train_sd": 1.4538471131584805,
+    "train_mean": 6.114190913731496
+  },
+  "wilcoxon_detail": {
+    "sbert_only_vs_sbert_meta": {
+      "W": 62734.0,
+      "n_pairs": 515,
+      "n_nonzero": 515,
+      "p": 0.27334787194583243,
+      "rank_biserial": 0.05570858734101001
+    }
+  },
+  "structural_feature_list": [
+    "char_count",
+    "word_count",
+    "line_count",
+    "avg_word_length",
+    "unique_word_ratio",
+    "long_word_ratio",
+    "sentence_count",
+    "avg_sentence_length",
+    "sentence_length_std",
+    "dialogue_density",
+    "unique_characters",
+    "exclamation_ratio",
+    "question_ratio",
+    "action_density",
+    "scene_count",
+    "words_per_scene"
+  ]
+}

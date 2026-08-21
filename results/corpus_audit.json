@@ -1,0 +1,47 @@
+{
+  "excel_records": 5204,
+  "duplicate_filenames_removed": 0,
+  "loaded_records": 356,
+  "skipped": {
+    "missing": 4848
+  },
+  "sha256": {
+    "unique_digests": 356,
+    "duplicate_groups": 0,
+    "records_in_duplicate_groups": 0,
+    "records_dropped": 0,
+    "group_size_histogram": {},
+    "groups_with_disagreeing_ratings": 0,
+    "max_rating_spread_in_group": 0.0,
+    "n_after_dedup": 356
+  },
+  "year_screen": {
+    "min_valid": 1900,
+    "max_valid": 2025,
+    "dropped": 0,
+    "dropped_records": []
+  },
+  "final_n": 356,
+  "families": {
+    "n_families": 356,
+    "n_multi_member": 0,
+    "largest": 1,
+    "top": [],
+    "same_family_same_year_extra_records": 0
+  },
+  "chronological": {
+    "train_max_year": 2019,
+    "n_train_pool": 345,
+    "n_holdout": 11,
+    "mean_rating_train_pool": 5.650144927536233,
+    "sd_rating_train_pool": 0.050072411334103145,
+    "mean_rating_holdout": 5.645454545454546,
+    "sd_rating_holdout": 0.05222329678670963
+  },
+  "rating_all": {
+    "mean": 5.650000000000001,
+    "sd": 0.050070373011603914,
+    "min": 5.6,
+    "max": 5.7
+  }
+}
