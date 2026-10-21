@@ -112,6 +112,8 @@ and the realised cardinality chain on this corpus is
 
 \subsection{Audit results}
 
+Table~\ref{tab:audit} is the full ledger for the flow of Section~\ref{sec:exclusion_flow}, and the nesting in (2) means every row of it is a strict subset of the row above.
+
 \begin{table}[t]
 \caption{Corpus integrity audit and exclusion ledger. Percentages are of the $5{,}204$ joined records.}
 \label{tab:audit}
@@ -147,7 +149,7 @@ Joined records (IMSDb $\bowtie$ IMDb) & 5,204 & 100.00 \\
 
 \emph{Metadata corruption is present and reaches the model.} Four records carry release years of 1080 or 1088, transparently mis-typed 1980 and 1988 (\emph{Breaker Morant}, \emph{Mississippi Burning}, \emph{Torch Song Trilogy}, \emph{The Blues Brothers}). We drop them rather than silently repair them.
 
-Twenty-seven records are excluded because positional identity in the archived embedding matrix cannot be resolved uniquely without a stored record key.
+Twenty-seven records are excluded because positional identity in the archived embedding matrix cannot be resolved uniquely without a stored record key. Twenty-seven positions inside the reconstruction gaps admit more than one consistent assignment; we drop them rather than guess.
 
 
 \section{Methodology and Representations}
@@ -155,7 +157,7 @@ Twenty-seven records are excluded because positional identity in the archived em
 
 \subsection{Structural screenplay statistics}
 
-Sixteen statistics are computed from the raw, uncleaned script text: six size measures (\texttt{char\_count}, \texttt{word\_count}, \texttt{line\_count}, \texttt{sentence\_count}, \texttt{scene\_count}, \texttt{words\_per\_scene}); three describing lexical sophistication (\texttt{avg\_word\_length}, \texttt{unique\_word\_ratio}, \texttt{long\_word\_ratio}); two describing sentence geometry (\texttt{avg\_sentence\_length}, \texttt{sentence\_length\_std}); two describing dialogue (\texttt{dialogue\_density}, \texttt{unique\_characters}); two emotional proxies (\texttt{exclamation\_ratio}, \texttt{question\_ratio}); and one stage-direction proxy (\texttt{action\_density}). Scene count is the number of case-insensitive \texttt{INT.}/\texttt{EXT.} matches. All sixteen describe the transcript as archived rather than the text the encoder receives.
+Sixteen statistics are computed from the raw, uncleaned script text: six size measures (\texttt{char\_count}, \texttt{word\_count}, \texttt{line\_count}, \texttt{sentence\_count}, \texttt{scene\_count}, \texttt{words\_per\_scene}); three describing lexical sophistication (\texttt{avg\_word\_length}, \texttt{unique\_word\_ratio}, \texttt{long\_word\_ratio}); two describing sentence geometry (\texttt{avg\_sentence\_length}, \texttt{sentence\_length\_std}); two describing dialogue (\texttt{dialogue\_density}, \texttt{unique\_characters}); two emotional proxies (\texttt{exclamation\_ratio}, \texttt{question\_ratio}); and one stage-direction proxy (\texttt{action\_density}). Scene count is the number of case-insensitive \texttt{INT.}/\texttt{EXT.} matches. All sixteen describe the transcript as archived rather than the text the encoder receives. Two of the sixteen are close to degenerate on this corpus, and the audit makes it visible before any model is fitted. Mean \texttt{dialogue\_density} is .0087$ with standard deviation .0361$, and mean \texttt{unique\_characters} is .41$. A feature film does not have three speaking parts. The speaker-cue regular expression assumes a \texttt{NAME:} convention that most IMSDb transcripts do not follow, so both features encode transcription format rather than dramaturgy. \texttt{scene\_count} has the same character: mean .0$ against a standard deviation of .5$.
 
 \subsection{Token-aligned chunking and mean pooling}
 \label{sec:tokens}
@@ -250,6 +252,8 @@ which we report alongside $p$ so that a small effect at large $n$ is not mistake
 
 \subsection{The cost of a stricter partition}
 
+Table~\ref{tab:grouped} isolates the cost of the group constraint; Table~\ref{tab:temporal} isolates the cost of the temporal one. Five systems, one corpus, one learner configuration throughout.
+
 \begin{table*}[t]
 \caption{Grouped five-fold results. P1 shuffles records; P2 enforces the title-family constraint (14). Pooled out-of-fold point estimates with 95\% percentile bootstrap intervals over $5{,}164$ records. $\Delta R^2$ is the explained variance lost to the constraint, i.e. the share of P1 skill that franchise overlap was supplying.}
 \label{tab:grouped}
@@ -298,6 +302,8 @@ Chronology costs a great deal. The same best system falls to $R^2 = 0.3089$, and
 
 \subsection{Paired comparisons}
 
+Table~\ref{tab:paired} reports every baseline against the best system on matched records.
+
 \begin{table}[t]
 \caption{Paired comparison against SBERT + metadata + XGBoost. $\Delta\mathrm{MAE}$ is positive when the reference system has lower error. $p$ from the two-sided Wilcoxon signed-rank test.}
 \label{tab:paired}
@@ -325,11 +331,11 @@ P3 & Constant mean & +0.2530 & [+0.195, +0.313] & $5.7 \times 10^{-15}$ \\
 \end{tabular}
 \end{table}
 
-Under P1 and P2, adding the three metadata columns to the embedding buys a highly significant 0.108--0.114 rating points of mean absolute error. Under P3 the same addition buys 0.0236 points, with an interval straddling zero and $p = 0.273$; the full statistics are $W = 62{,}734$ over $n = 515$ pairs with no ties, rank-biserial $r = +0.056$. The metadata block, worth two orders of magnitude in p-value under a random split, is not measurably useful when the test films are genuinely unseen.
+The final row is the one that changes the story. Under P1 and P2, adding the three metadata columns to the embedding buys a highly significant 0.108--0.114 rating points of mean absolute error. Under P3 the same addition buys 0.0236 points, with an interval straddling zero and $p = 0.273$; the full statistics are $W = 62{,}734$ over $n = 515$ pairs with no ties, rank-biserial $r = +0.056$. The metadata block, worth two orders of magnitude in p-value under a random split, is not measurably useful when the test films are genuinely unseen.
 
 \subsection{Temporal shift in detail}
 
-Part of the $R^2$ collapse is therefore arithmetic --- the same absolute error against a narrower target yields a smaller $R^2$ --- and part is genuine degradation. Mean absolute error separates them: it is $0.7276$ under P1 and $0.7232$ under P3, statistically indistinguishable. What collapses is how much of the (now narrower) variance it can order. Regressing prediction on truth over the holdout gives slope $0.4634$ (s.e. $0.0278$) and intercept $3.1745$, against an ideal slope of 1.
+Part of the $R^2$ collapse is therefore arithmetic --- the same absolute error against a narrower target yields a smaller $R^2$ --- and part is genuine degradation. Mean absolute error separates them: it is $0.7276$ under P1 and $0.7232$ under P3, statistically indistinguishable. The model's typical error in rating points does not grow at all when it predicts the future. What collapses is how much of the (now narrower) variance it can order. Regressing prediction on truth over the holdout gives slope $0.4634$ (s.e. $0.0278$) and intercept $3.1745$, against an ideal slope of 1; the predicted standard deviation is .783$ of the observed one. The system is heavily shrunk toward the centre --- it identifies which films are above or below average and declines to commit to how far.
 
 
 \section{What the Features Are Doing}
@@ -357,18 +363,22 @@ Runtime is the opposite case. It transfers cleanly, because a 130-minute film in
 
 \section{Threats to Validity and Limitations}
 
+\textbf{The content-digest audit is verified on a subset.} As stated in Section III, SHA-256 deduplication was executed over the 356 script files distributed with the code and returned zero duplicate groups. The metadata identity keys covering all 5,204 records found no duplicate identifiers and no duplicate title$\times pairs, which bounds the plausible residual duplication, but does not eliminate the possibility of two distinct films sharing a byte-identical file through a scraping error. We report this rather than assert a number we did not compute.
+
 \textbf{Selection effects in IMSDb are severe and not correctable.} Contributors upload what they value, so canonical and acclaimed films are over-represented among older titles while recent years sample more broadly. The corpus-wide mean rating falls monotonically from 7.87 in the 1920s to 5.48 in the 2010s, which is a statement about who uploads what, not about film quality. Any model reading \texttt{year} learns this curation artifact, and P3 is the protocol that refuses to reward it. Generalisation claims extend to films resembling IMSDb's selection, not to an arbitrary IMDb title.
 
 \textbf{Temporal target compression confounds $R^2$.} The holdout's rating standard deviation is $0.80\times$ the training pool's. Because $R^2$ is normalised by target variance, part of the $0.536 \to 0.309$ drop is definitional. We report MAE alongside for this reason, and MAE is flat across protocols. Readers should treat the $R^2$ collapse as a statement about \emph{rank-ordering power on recent films}, not about absolute error growth.
 
 \textbf{The strongest transferring feature is unavailable at deployment.} Runtime dominates the temporal holdout, matching the entire embedding block under permutation. A screenplay-stage predictor does not know the runtime, because the film has not been cut --- or shot.
 
+\textbf{Single encoder, single pooling.} We audit mean-pooled \texttt{all-MiniLM-L6-v2}. Larger encoders, learned pooling, and token-aligned windows are all plausible improvements, and none is evaluated here; the point of the paper is the protocol, and holding the representation fixed is what makes the protocol comparison clean.
+
 
 \section{Conclusion}
 
 We audited a screenplay-to-rating pipeline instead of extending it. The corpus turned out to be clean at the record level --- 5,204 distinct identifiers, no repeated title$\times$year pair --- but to carry 164 multi-member title families, four corrupt release years, and a corrupt ordinal decade vocabulary that reaches the feature matrix intact. The chunking configuration turned out to discard 31.60\% of WordPiece tokens without warning, because the window is measured in words and the budget is measured in tokens. And the headline metric turned out to depend on the partition far more than on the model: $R^2 = 0.549$ under random folds, 0.536 once franchises are kept together, 0.309 when the test films are drawn from years the model never saw.
 
-The block-permutation analysis identifies the mechanism. Release year supplies 11\% of in-sample split gain and exactly zero out-of-sample utility, because every holdout year falls beyond the training range and a tree ensemble cannot extrapolate past its last split point. Runtime transfers; semantics transfer; the calendar does not.
+The block-permutation analysis identifies the mechanism. Release year supplies 11\% of in-sample split gain and exactly zero out-of-sample utility, because every holdout year falls beyond the training range and a tree ensemble cannot extrapolate past its last split point. Runtime transfers; semantics transfer; the calendar does not. For anyone building a screenplay-stage predictor, the operational recommendations are narrow and concrete: group by title family, hold out by release year, report MAE next to ^2$ when the target distribution shifts, align the chunk to the tokeniser rather than to whitespace, and store an immutable record key beside every cached representation.
 
 \section*{Reproducibility}
 
