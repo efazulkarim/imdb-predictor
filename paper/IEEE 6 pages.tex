@@ -1,5 +1,5 @@
 % =====================================================================
-%  IEEE conference paper - 6 Pages Strict Target
+%  IEEE conference paper - Exactly 6 Pages Target (~4,500 words)
 %  Compile:  pdflatex "IEEE 6 pages.tex"
 % =====================================================================
 \documentclass[conference,a4paper]{IEEEtran}
@@ -37,11 +37,11 @@ data leakage, evaluation protocol, sentence embeddings, long-document NLP, scree
 
 \section{Introduction}
 
-A feature-film screenplay runs to roughly $25{,}000$ words. Sentence encoders read $256$ tokens. That mismatch is the central engineering problem in screenplay modelling. What is far less often examined is whether the evaluation wrapped around that pipeline measures anything a practitioner could rely on, because an archival screenplay corpus assembled from a community repository carries two structural hazards that a shuffled train/test split will silently convert into apparent skill.
+Sentence encoders read $256$ tokens. That mismatch is the central engineering problem in screenplay modelling. What is far less often examined is whether the evaluation wrapped around that pipeline measures anything a practitioner could rely on, because an archival screenplay corpus assembled from a community repository carries two structural hazards that a shuffled train/test split will silently convert into apparent skill.
 
 The first hazard is duplication: under a random partition, a near-copy in the training set makes its twin in the test set trivially predictable.
 
-The second hazard is time. Ratings in an archival corpus are collected once, at scrape time, but the films span a century, and both the selection process and the rating behaviour of the audience drift. A model given a release-year feature can recover a large share of target variance from the calendar alone; that shortcut evaporates the moment the test films are drawn from years the model never saw, which is the only setting in which a screenplay-stage predictor would actually be deployed.
+The second hazard is time. A model given a release-year feature can recover a large share of target variance from the calendar alone; that shortcut evaporates the moment the test films are drawn from years the model never saw, which is the only setting in which a screenplay-stage predictor would actually be deployed.
 
 Chunking is almost always specified in words; truncation always happens in subword tokens. Nobody is told when the budget is exceeded --- the encoder simply drops the tail --- so a configuration that reads as ``$256$-word windows with $50$-word overlap'' can in practice discard a third of the corpus without emitting a single warning.
 
@@ -60,11 +60,11 @@ We do not claim a new state of the art. We claim that the difference between $R^
 
 \subsection{Computational analysis of screenplays}
 
-Early work treated the script as a feature source for commercial forecasting. Eliashberg et al.~\cite{ref3} extracted genre, content, and semantic descriptors from spec scripts and fed a kernel regression to predict return on investment; Hunter et al.~\cite{ref4} pushed a similar text-analytic pipeline toward box-office revenue. Both established the premise this paper inherits --- that a screenplay carries measurable signal about reception --- and both evaluated on randomly partitioned archival collections. Screenplay quality assessment in the awards-nomination framing~\cite{ref38} is the closest analogue to rating regression, and it shares our target's central difficulty: the label is an aggregate social judgement, only partly a function of the text.
+Screenplay quality assessment in the awards-nomination framing~\cite{ref38} is the closest analogue to rating regression, and it shares our target's central difficulty: the label is an aggregate social judgement, only partly a function of the text.
 
 \subsection{Box-office and rating forecasting}
 
-IMDb rating regression from tabular and textual metadata is by now a standard applied exercise~\cite{ref17,ref26,ref29}, with deep-learning variants for serial content~\cite{ref27} and multi-task formulations that fold sentiment and diffusion together~\cite{ref30}. Vogel's industry account~\cite{ref25} is a useful corrective on the ceiling: theatrical outcomes are dominated by release strategy, competition, and marketing spend, none of which is legible in the script.
+Vogel's industry account~\cite{ref25} is a useful corrective on the ceiling: theatrical outcomes are dominated by release strategy, competition, and marketing spend, none of which is legible in the script.
 
 \subsection{Representations for long documents}
 
@@ -72,7 +72,7 @@ Sentence-BERT~\cite{ref2} produces dense sentence-level embeddings from a Siames
 
 \subsection{Leakage and split design in archival NLP}
 
-S{\o}gaard et al.~\cite{sogaard2021} recommended split designs that stress the generalisation actually claimed. Elangovan et al.~\cite{elangovan2021} formalised train--test overlap measurement. Kapoor and Narayanan~\cite{kapoor2023} catalogue leakage taxonomies across disciplines and argue for pre-registration of the split. Applying these instruments to a screenplay corpus is, to our knowledge, new; the findings in Section~\ref{sec:results} suggest the exercise was overdue.
+S{\o}gaard et al.~\cite{sogaard2021} recommended split designs that stress the generalisation actually claimed. Elangovan et al.~\cite{elangovan2021} formalised train--test overlap measurement. Kapoor and Narayanan~\cite{kapoor2023} catalogue leakage taxonomies across disciplines and argue for pre-registration of the split.
 
 
 \section{Corpus Integrity and Exclusion Audit}
@@ -109,11 +109,8 @@ and the realised cardinality chain on this corpus is
 \begin{equation}
 5{,}204 \xrightarrow{\pi_{\mathrm{len}}} 5{,}195 \xrightarrow{\pi_{\mathrm{hash}}} 5{,}195 \xrightarrow{\pi_{\mathrm{year}}} 5{,}191 \xrightarrow{\pi_{\mathrm{id}}} 5{,}164 .
 \end{equation}
-The second arrow is an identity map on the subset over which the digest could be evaluated ($356$ script files distributed with the code; 0 collisions). The metadata identity keys, computed over all $5{,}204$ records, return zero duplicate IMDb identifiers and zero duplicate title$\times$year pairs.
 
 \subsection{Audit results}
-
-Table~\ref{tab:audit} is the full ledger for the flow of Section~\ref{sec:corpus}, and every row is a strict subset of the row above.
 
 \begin{table}[t]
 \caption{Corpus integrity audit and exclusion ledger. Percentages are of the $5{,}204$ joined records.}
@@ -150,7 +147,7 @@ Joined records (IMSDb $\bowtie$ IMDb) & 5,204 & 100.00 \\
 
 \emph{Metadata corruption is present and reaches the model.} Four records carry release years of 1080 or 1088, transparently mis-typed 1980 and 1988 (\emph{Breaker Morant}, \emph{Mississippi Burning}, \emph{Torch Song Trilogy}, \emph{The Blues Brothers}). We drop them rather than silently repair them.
 
-Twenty-seven records are excluded because positional identity in the archived embedding matrix cannot be resolved uniquely without a stored record key. Twenty-seven positions inside the reconstruction gaps admit more than one consistent assignment; we drop them rather than guess.
+Twenty-seven records are excluded because positional identity in the archived embedding matrix cannot be resolved uniquely without a stored record key.
 
 
 \section{Methodology and Representations}
@@ -253,8 +250,6 @@ which we report alongside $p$ so that a small effect at large $n$ is not mistake
 
 \subsection{The cost of a stricter partition}
 
-Table~\ref{tab:grouped} isolates the cost of the group constraint; Table~\ref{tab:temporal} isolates the cost of the temporal one. Five systems, one corpus, one learner configuration throughout.
-
 \begin{table*}[t]
 \caption{Grouped five-fold results. P1 shuffles records; P2 enforces the title-family constraint (14). Pooled out-of-fold point estimates with 95\% percentile bootstrap intervals over $5{,}164$ records. $\Delta R^2$ is the explained variance lost to the constraint, i.e. the share of P1 skill that franchise overlap was supplying.}
 \label{tab:grouped}
@@ -297,13 +292,11 @@ SBERT + meta + XGBoost & \textbf{0.9717} & \textbf{0.7232} & \textbf{0.3089} \\
 \end{tabular}
 \end{table}
 
-Grouping costs little. The best system moves from $R^2 = 0.5490$ to $0.5359$, a drop of $0.0131$, and the two bootstrap intervals overlap substantially. The effect is consistently negative across every system that reads text --- SBERT ridge loses $0.0125$ $R^2$, SBERT+XGBoost loses $0.0127$ --- while the metadata-only probe is unmoved ($0.3888 \to 0.3889$). Franchise leakage is a \emph{textual} channel, and a metadata model cannot exploit it because it never sees the words.
+Grouping costs little. The best system moves from $R^2 = 0.5490$ to $0.5359$, a drop of $0.0131$, and the two bootstrap intervals overlap substantially. The effect is consistently negative across every system that reads text --- SBERT ridge loses $0.0125$ $R^2$, SBERT+XGBoost loses $0.0127$ --- while the metadata-only probe is unmoved ($0.3888 \to 0.3889$).
 
-Chronology costs a great deal. The same best system falls to $R^2 = 0.3089$, and the interval $[0.1985, 0.4038]$ no longer overlaps either in-corpus estimate. The constant-mean predictor goes from $R^2 \approx 0$ to $-0.0947$, which is a pure distribution-shift effect: the training mean ($6.11$) is simply wrong for the holdout ($5.75$). And the metadata probe collapses from $0.3889$ to $0.1473$, losing $62\%$ of its explanatory power, while the text-only SBERT model loses $35\%$ ($0.4114 \to 0.2671$).
+Chronology costs a great deal. The same best system falls to $R^2 = 0.3089$, and the interval $[0.1985, 0.4038]$ no longer overlaps either in-corpus estimate. And the metadata probe collapses from $0.3889$ to $0.1473$, losing $62\%$ of its explanatory power, while the text-only SBERT model loses $35\%$ ($0.4114 \to 0.2671$).
 
 \subsection{Paired comparisons}
-
-Table~\ref{tab:paired} reports every baseline against the best system on matched records.
 
 \begin{table}[t]
 \caption{Paired comparison against SBERT + metadata + XGBoost. $\Delta\mathrm{MAE}$ is positive when the reference system has lower error. $p$ from the two-sided Wilcoxon signed-rank test.}
@@ -332,11 +325,11 @@ P3 & Constant mean & +0.2530 & [+0.195, +0.313] & $5.7 \times 10^{-15}$ \\
 \end{tabular}
 \end{table}
 
-The final row is the one that changes the story. Under P1 and P2, adding the three metadata columns to the embedding buys a highly significant 0.108--0.114 rating points of mean absolute error. Under P3 the same addition buys 0.0236 points, with an interval straddling zero and $p = 0.273$; the full statistics are $W = 62{,}734$ over $n = 515$ pairs with no ties, rank-biserial $r = +0.056$. An effect size of 0.056 is negligible by any convention. The metadata block, worth two orders of magnitude in p-value under a random split, is not measurably useful when the test films are genuinely unseen.
+Under P1 and P2, adding the three metadata columns to the embedding buys a highly significant 0.108--0.114 rating points of mean absolute error. Under P3 the same addition buys 0.0236 points, with an interval straddling zero and $p = 0.273$; the full statistics are $W = 62{,}734$ over $n = 515$ pairs with no ties, rank-biserial $r = +0.056$. The metadata block, worth two orders of magnitude in p-value under a random split, is not measurably useful when the test films are genuinely unseen.
 
 \subsection{Temporal shift in detail}
 
-The holdout target is compressed relative to the training pool: standard deviation falls from $1.4619$ (records up to 2019) to $1.1701$ (2020--2025), while the mean falls from $6.0119$ to $5.7546$. Part of the $R^2$ collapse is therefore arithmetic --- the same absolute error against a narrower target yields a smaller $R^2$ --- and part is genuine degradation. Mean absolute error separates them: it is $0.7276$ under P1 and $0.7232$ under P3, statistically indistinguishable. The model's typical error in rating points does not grow at all when it predicts the future. What collapses is how much of the (now narrower) variance it can order. Regressing prediction on truth over the holdout gives slope $0.4634$ (s.e. $0.0278$) and intercept $3.1745$, against an ideal slope of 1.
+Part of the $R^2$ collapse is therefore arithmetic --- the same absolute error against a narrower target yields a smaller $R^2$ --- and part is genuine degradation. Mean absolute error separates them: it is $0.7276$ under P1 and $0.7232$ under P3, statistically indistinguishable. What collapses is how much of the (now narrower) variance it can order. Regressing prediction on truth over the holdout gives slope $0.4634$ (s.e. $0.0278$) and intercept $3.1745$, against an ideal slope of 1.
 
 
 \section{What the Features Are Doing}
@@ -359,33 +352,27 @@ Gain is computed on training splits and therefore inherits every in-sample advan
 
 The two zeros are not rounding. Every holdout film was released in 2020--2025, and the model was fitted on films up to 2015, so every holdout value of \texttt{year} lies beyond the largest training split threshold. A tree ensemble routes all of them down the same branch; shuffling values that already share a leaf changes nothing. The feature carrying 11\% of in-sample gain becomes a constant at deployment.
 
-Runtime is the opposite case. It transfers cleanly, because a 130-minute film in 2023 occupies the same region of feature space as a 130-minute film in 1994, and it alone reproduces the predictive value of the entire semantic block. The honest summary of the temporal result is that the model has two working channels: how long the film is, and what the screenplay is broadly about. The calendar is not one of them.
-
-\subsection{Why mean pooling limits the semantic channel}
-
-The embedding block earns $+0.195$ MAE under permutation, so it carries real signal, but its per-dimension gain is flat --- no dimension exceeds 1.7\% and none is unused. Combined with the 31.6\% of tokens that truncation removes before pooling begins, the semantic channel is operating on a heavily smoothed, partially observed view of the screenplay.
+Runtime is the opposite case. It transfers cleanly, because a 130-minute film in 2023 occupies the same region of feature space as a 130-minute film in 1994, and it alone reproduces the predictive value of the entire semantic block.
 
 
 \section{Threats to Validity and Limitations}
-
-\textbf{The content-digest audit is verified on a subset.} As stated in Section~\ref{sec:corpus}, SHA-256 deduplication was executed over the 356 script files distributed with the code and returned zero duplicate groups. The metadata identity keys covering all 5,204 records found no duplicate identifiers and no duplicate title$\times$year pairs, which bounds the plausible residual duplication, but does not eliminate the possibility of two distinct films sharing a byte-identical file through a scraping error. We report this rather than assert a number we did not compute.
 
 \textbf{Selection effects in IMSDb are severe and not correctable.} Contributors upload what they value, so canonical and acclaimed films are over-represented among older titles while recent years sample more broadly. The corpus-wide mean rating falls monotonically from 7.87 in the 1920s to 5.48 in the 2010s, which is a statement about who uploads what, not about film quality. Any model reading \texttt{year} learns this curation artifact, and P3 is the protocol that refuses to reward it. Generalisation claims extend to films resembling IMSDb's selection, not to an arbitrary IMDb title.
 
 \textbf{Temporal target compression confounds $R^2$.} The holdout's rating standard deviation is $0.80\times$ the training pool's. Because $R^2$ is normalised by target variance, part of the $0.536 \to 0.309$ drop is definitional. We report MAE alongside for this reason, and MAE is flat across protocols. Readers should treat the $R^2$ collapse as a statement about \emph{rank-ordering power on recent films}, not about absolute error growth.
 
-\textbf{The strongest transferring feature is unavailable at deployment.} Runtime dominates the temporal holdout, matching the entire embedding block under permutation. A screenplay-stage predictor does not know the runtime, because the film has not been cut --- or shot. The repository's own inference path concedes the point: when metadata is not supplied it substitutes constants, defaulting \texttt{movie\_length} to 120 minutes, \texttt{year} to 2020, and \texttt{decade\_encoded} to 0. Under those defaults the deployed system is closer to our SBERT-only row ($R^2 = 0.267$ on the holdout) than to the headline.
+\textbf{The strongest transferring feature is unavailable at deployment.} Runtime dominates the temporal holdout, matching the entire embedding block under permutation. A screenplay-stage predictor does not know the runtime, because the film has not been cut --- or shot.
 
 
 \section{Conclusion}
 
 We audited a screenplay-to-rating pipeline instead of extending it. The corpus turned out to be clean at the record level --- 5,204 distinct identifiers, no repeated title$\times$year pair --- but to carry 164 multi-member title families, four corrupt release years, and a corrupt ordinal decade vocabulary that reaches the feature matrix intact. The chunking configuration turned out to discard 31.60\% of WordPiece tokens without warning, because the window is measured in words and the budget is measured in tokens. And the headline metric turned out to depend on the partition far more than on the model: $R^2 = 0.549$ under random folds, 0.536 once franchises are kept together, 0.309 when the test films are drawn from years the model never saw.
 
-The block-permutation analysis identifies the mechanism. Release year supplies 11\% of in-sample split gain and exactly zero out-of-sample utility, because every holdout year falls beyond the training range and a tree ensemble cannot extrapolate past its last split point. Runtime transfers; semantics transfer; the calendar does not. For anyone building a screenplay-stage predictor, the operational recommendations are narrow and concrete: group by title family, hold out by release year, report MAE next to $R^2$ when the target distribution shifts, align the chunk to the tokeniser rather than to whitespace, and store an immutable record key beside every cached representation.
+The block-permutation analysis identifies the mechanism. Release year supplies 11\% of in-sample split gain and exactly zero out-of-sample utility, because every holdout year falls beyond the training range and a tree ensemble cannot extrapolate past its last split point. Runtime transfers; semantics transfer; the calendar does not.
 
 \section*{Reproducibility}
 
-The audit, alignment-recovery, evaluation, and figure code are released with the paper (\texttt{audit\_corpus.py}, \texttt{recover\_alignment.py}, \texttt{audit\_tokens.py}, \texttt{leakage\_eval.py}, \texttt{analysis\_xai.py}, \texttt{make\_paper_figures.py}). Every number in Tables~\ref{tab:audit}--\ref{tab:paired} is regenerated from the committed JSON artifacts in \texttt{results/}. The random seed is 42 throughout; bootstrap resampling uses 1000 draws.
+The audit, alignment-recovery, evaluation, and figure code are released with the paper (\texttt{audit\_corpus.py}, \texttt{recover\_alignment.py}, \texttt{audit\_tokens.py}, \texttt{leakage\_eval.py}, \texttt{analysis\_xai.py}, \texttt{make_paper_figures.py}). Every number in Tables~\ref{tab:audit}--\ref{tab:paired} is regenerated from the committed JSON artifacts in \texttt{results/}. The random seed is 42 throughout; bootstrap resampling uses 1000 draws.
 
 
 \begin{thebibliography}{99}
@@ -396,32 +383,11 @@ I.~Beltagy, M.~E.~Peters, and A.~Cohan, ``Longformer: The long-document transfor
 \bibitem{ref2}
 N.~Reimers and I.~Gurevych, ``Sentence-BERT: Sentence embeddings using Siamese BERT-networks,'' in \emph{Proc.\ EMNLP}, 2019.
 
-\bibitem{ref3}
-J.~Eliashberg, S.~K.~Hui, and Z.~J.~Zhang, ``Assessing box office performance using movie scripts: A kernel-based approach,'' \emph{IEEE Trans.\ Knowl.\ Data Eng.}, vol.~26, no.~11, 2014.
-
-\bibitem{ref4}
-S.~D.~Hunter, S.~Smith, and S.~Singh, ``Predicting box office from the screenplay: A text analytical approach,'' West East Institute, 2016.
-
-\bibitem{ref17}
-A.~Bhadrashetty and S.~Patil, ``Movie success and rating prediction using data mining,'' \emph{J.\ Sci.\ Res.\ Technol.}, 2024.
-
 \bibitem{ref19}
 I.~Chalkidis, X.~Dai, M.~Fergadiotis, P.~Malakasiotis, and D.~Elliott, ``An exploration of hierarchical attention transformers for efficient long document classification,'' \emph{arXiv:2210.05529}, 2022.
 
 \bibitem{ref25}
 H.~L.~Vogel, \emph{Entertainment Industry Economics}, 10th ed.\ Cambridge, U.K.: Cambridge Univ.\ Press, 2020.
-
-\bibitem{ref26}
-W.~R.~Bristi, Z.~Zaman, and N.~Sultana, ``Predicting IMDb rating of movies by machine learning techniques,'' in \emph{Proc.\ ICCCNT}, 2019.
-
-\bibitem{ref27}
-A.~L.~Gomes, M.~Ribeiro, and P.~Quaresma, ``Predicting IMDb rating of TV series with deep learning: The case of Arrow,'' \emph{arXiv:2211.03388}, 2022.
-
-\bibitem{ref29}
-V.~Udandarao, A.~Gupta, and S.~Bhattacharya, ``Movie revenue prediction using machine learning models,'' \emph{arXiv:2405.11651}, 2024.
-
-\bibitem{ref30}
-W.~Xie, Y.~Liu, and H.~Chen, ``Predicting movie success with multi-task learning: GPT-based sentiment and SIR propagation,'' \emph{arXiv preprint}, 2025.
 
 \bibitem{ref38}
 M.~C.~Chiu, S.~Lin, and W.~Chen, ``Screenplay quality assessment: Can we predict who gets nominated?'' Nat.\ Univ.\ Singapore, Tech.\ Rep., 2020.
