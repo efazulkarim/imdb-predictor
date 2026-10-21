@@ -183,6 +183,7 @@ Use any model from: https://www.sbert.net/docs/pretrained_models.html
 
 ## 📚 Research & Documentation
 
+- **paper/main.pdf** & **paper/main.docx**: Full Research Paper — *"What Survives a Strict Split? An Empirical Audit of Long-Document Screenplay Modelling for IMDb Rating Prediction"* (available in PDF, Word DOCX, and LaTeX formats)
 - **CONCEPTUAL_GUIDE.md**: Detailed methodology explanation
 - **RESEARCH_QA.md**: Q&A on approach and design decisions
 - **PRESENTATION_SPEECH.md**: Project overview and findings
