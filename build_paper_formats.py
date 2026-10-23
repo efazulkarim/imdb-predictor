@@ -348,11 +348,13 @@ def braced(s, start):
     raise ValueError('unbalanced braces')
 
 
-def parse_tabular(src, md=True, omml=False):
+def parse_tabular(src, md=True, omml=False, spans=False):
     """Extract (caption, rows) from a table environment body.
 
     md=False strips Markdown emphasis markers, which must not leak into
     DOCX cells where emphasis is carried by run formatting instead.
+    spans=True makes each cell a (text, column span) pair, so that
+    \\multicolumn headers and footnote rows can be merged in the DOCX.
     """
     cap = ''
     mc = re.search(r'\\caption\{', src)
@@ -372,12 +374,14 @@ def parse_tabular(src, md=True, omml=False):
             continue
         cells = []
         for c in split_cells(raw):
+            span = re.match(r'\s*\\multicolumn\{(\d+)\}', c)
             c = re.sub(r'\\multicolumn\{\d+\}\{[^{}]*\}\{(.*)\}', r'\1', c.strip(),
                        flags=re.S)
             c = re.sub(r'\\multirow\{[^{}]*\}\{[^{}]*\}\{(.*?)\}', r'\1', c, flags=re.S)
             c = c.replace(r'\footnotesize', '')
-            cells.append(inline(c, md, omml))
-        if any(cells):
+            t = inline(c, md, omml)
+            cells.append((t, int(span.group(1)) if span else 1) if spans else t)
+        if any(c[0] if spans else c for c in cells):
             rows.append(cells)
     return inline(cap, md, omml), rows
 
@@ -474,18 +478,78 @@ def to_markdown(blocks):
 # ------------------------------------------------------------------
 # DOCX writer
 # ------------------------------------------------------------------
+# Page geometry and type sizes copied from IEEEtran [conference,a4paper],
+# so the Word file breaks pages where the LaTeX PDF does: 516pt text
+# width in two 252pt columns, 672pt text height, 10pt type on 12pt lines.
+PAGE_W, PAGE_H = 595.3, 841.9
+MARGIN_LR, MARGIN_TOP = 39.65, 47.0
+MARGIN_BOTTOM = PAGE_H - MARGIN_TOP - 672.0
+COL_GAP = 12.0
+TEXT_W = PAGE_W - 2 * MARGIN_LR
+COL_W = (TEXT_W - COL_GAP) / 2
+LEADING = {10: 12.0, 9: 10.5, 8: 9.5}
+
+
 def set_columns(section, n):
     cols = section._sectPr.xpath('./w:cols')[0]
     cols.set(qn('w:num'), str(n))
-    cols.set(qn('w:space'), '240')
+    cols.set(qn('w:space'), str(int(COL_GAP * 20)))
 
 
-def shade(cell, hexcolor='D9E2F3'):
-    tcPr = cell._tc.get_or_add_tcPr()
-    shd = OxmlElement('w:shd')
-    shd.set(qn('w:val'), 'clear')
-    shd.set(qn('w:fill'), hexcolor)
-    tcPr.append(shd)
+def _border(parent, side, sz=6):
+    b = OxmlElement(f'w:{side}')
+    b.set(qn('w:val'), 'single')
+    b.set(qn('w:sz'), str(sz))
+    b.set(qn('w:space'), '0')
+    b.set(qn('w:color'), '000000')
+    parent.append(b)
+
+
+def booktabs(table, header_rows):
+    """Top and bottom rules on the table, a mid rule under the header."""
+    tblPr = table._tbl.tblPr
+    borders = OxmlElement('w:tblBorders')
+    _border(borders, 'top', 8)
+    _border(borders, 'bottom', 8)
+    mar = OxmlElement('w:tblCellMar')
+    for side in ('left', 'right'):
+        e = OxmlElement(f'w:{side}')
+        e.set(qn('w:w'), '60')                 # 3pt, close to \tabcolsep
+        e.set(qn('w:type'), 'dxa')
+        mar.append(e)
+    # schema order: ... jc, tblBorders, shd, tblLayout, tblCellMar, tblLook
+    layout = tblPr.find(qn('w:tblLayout'))
+    look = tblPr.find(qn('w:tblLook'))
+    (layout if layout is not None else look).addprevious(borders)
+    if look is not None:
+        look.addprevious(mar)
+    else:
+        tblPr.append(mar)
+    for cell in table.rows[header_rows - 1].cells:
+        tcb = OxmlElement('w:tcBorders')
+        _border(tcb, 'bottom', 4)
+        cell._tc.get_or_add_tcPr().append(tcb)
+
+
+def text_width(s, size):
+    """Rough Times width of a cell, with math tokens at their plain length."""
+    s = MATH_TOKEN.sub(lambda m: plain_math(MATH[int(m.group(1))]), s)
+    return len(s) * size * 0.47
+
+
+def column_widths(rows, ncol, avail, size=8):
+    """Natural content widths, shrunk proportionally if they overflow."""
+    nat = [12.0] * ncol
+    for row in rows:
+        c = 0
+        for txt, span in row:
+            if span == 1 and c < ncol:
+                nat[c] = max(nat[c], text_width(txt, size) + 7)
+            c += span
+    tot = sum(nat)
+    if tot > avail:
+        nat = [w * avail / tot for w in nat]
+    return nat
 
 
 MNS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
@@ -525,7 +589,9 @@ def size_math(el, pt):
         rpr = r.find(qn('w:rPr'))
         if rpr is None:
             rpr = OxmlElement('w:rPr')
-            r.insert(0, rpr)
+            # schema order inside m:r is m:rPr, w:rPr, then the text
+            mrpr = r.find(f'{{{MNS}}}rPr')
+            r.insert(0 if mrpr is None else r.index(mrpr) + 1, rpr)
         for old in rpr.findall(qn('w:sz')):
             rpr.remove(old)
         sz = OxmlElement('w:sz')
@@ -558,25 +624,38 @@ def to_docx(blocks, path):
     st = doc.styles['Normal']
     st.font.name = 'Times New Roman'
     st.font.size = Pt(10)
+    st.paragraph_format.space_before = Pt(0)
     st.paragraph_format.space_after = Pt(0)
-    st.paragraph_format.first_line_indent = Inches(0.2)
+    st.paragraph_format.line_spacing = Pt(LEADING[10])
+    st.paragraph_format.first_line_indent = Pt(10)
     st.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    # LaTeX hyphenates; without this Word sets visibly looser lines.
+    hyph = OxmlElement('w:autoHyphenation')
+    tab = doc.settings.element.find(qn('w:defaultTabStop'))
+    tab.addnext(hyph)                       # schema position: after it
 
     sec = doc.sections[0]
-    sec.page_width, sec.page_height = Inches(8.27), Inches(11.69)   # A4
-    for side in ('left_margin', 'right_margin'):
-        setattr(sec, side, Inches(0.63))
-    sec.top_margin, sec.bottom_margin = Inches(0.75), Inches(0.75)
+    sec.page_width, sec.page_height = Pt(PAGE_W), Pt(PAGE_H)          # A4
+    sec.left_margin = sec.right_margin = Pt(MARGIN_LR)
+    sec.top_margin, sec.bottom_margin = Pt(MARGIN_TOP), Pt(MARGIN_BOTTOM)
 
     def para(text, size=10, bold=False, italic=False, align=None,
-             indent=None, space_before=0, space_after=0):
+             indent=None, space_before=0, space_after=0, small_caps=False):
         p = doc.add_paragraph()
         add_rich(p, text, size, bold, italic)
+        if small_caps:
+            for r in p.runs:
+                r.font.small_caps = True
         if align is not None:
             p.alignment = align
-        p.paragraph_format.first_line_indent = Inches(indent if indent is not None else 0)
-        p.paragraph_format.space_before = Pt(space_before)
-        p.paragraph_format.space_after = Pt(space_after)
+        pf = p.paragraph_format
+        pf.first_line_indent = Pt(indent if indent is not None else 0)
+        pf.space_before = Pt(space_before)
+        pf.space_after = Pt(space_after)
+        if size in LEADING:
+            pf.line_spacing = Pt(LEADING[size])
+        else:
+            pf.line_spacing = 1.0
         return p
 
     single_now = True   # title block starts single-column
@@ -594,88 +673,115 @@ def to_docx(blocks, path):
 
     for kind, payload in blocks:
         if kind == 'title':
-            para(payload, size=20, align=WD_ALIGN_PARAGRAPH.CENTER,
-                 space_after=10)
+            para(payload, size=22, align=WD_ALIGN_PARAGRAPH.CENTER,
+                 space_after=8)
             para('Anonymous authors', size=11,
-                 align=WD_ALIGN_PARAGRAPH.CENTER, space_after=14)
+                 align=WD_ALIGN_PARAGRAPH.CENTER, space_after=12)
         elif kind == 'abstract':
             ensure_columns(2)
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            p.paragraph_format.first_line_indent = Inches(0.2)
+            p.paragraph_format.first_line_indent = Pt(10)
+            p.paragraph_format.line_spacing = Pt(LEADING[9])
             r = p.add_run('Abstract\u2014')
             r.bold = True
             r.italic = True
             r.font.size = Pt(9)
             add_rich(p, inline(payload, md=False, omml=True), size=9, bold=True)
-            p.paragraph_format.space_after = Pt(6)
+            p.paragraph_format.space_after = Pt(4)
         elif kind == 'keywords':
             p = doc.add_paragraph()
-            p.paragraph_format.first_line_indent = Inches(0.2)
+            p.paragraph_format.first_line_indent = Pt(10)
+            p.paragraph_format.line_spacing = Pt(LEADING[9])
             r = p.add_run('Index Terms\u2014')
             r.bold = True
             r.italic = True
             r.font.size = Pt(9)
             r2 = p.add_run(inline(payload, md=False))
-            r2.italic = True
+            r2.bold = True
             r2.font.size = Pt(9)
-            p.paragraph_format.space_after = Pt(8)
+            p.paragraph_format.space_after = Pt(4)
         elif kind == 'sec':
             ensure_columns(2)
             num, txt = payload
-            para(f'{num} {txt}'.strip().upper(), size=10,
-                 align=WD_ALIGN_PARAGRAPH.CENTER, space_before=10,
-                 space_after=4)
+            p = para(f'{num} {txt}'.strip(), size=10, small_caps=True,
+                     align=WD_ALIGN_PARAGRAPH.CENTER, space_before=8,
+                     space_after=4)
+            p.paragraph_format.keep_with_next = True
         elif kind == 'sub':
             num, txt = payload
-            para(f'{num} {txt}', size=10, italic=True, space_before=6,
-                 space_after=2)
+            p = para(f'{num} {txt}', size=10, italic=True, space_before=4,
+                     space_after=2)
+            p.paragraph_format.keep_with_next = True
         elif kind == 'para':
             for chunk in re.split(r'\n\s*\n', payload):
                 t = inline(chunk, md=False, omml=True)
                 if t:
-                    para(t, indent=0.2, space_after=3)
+                    para(t, indent=10)
         elif kind == 'itemize':
             for item in payload.split(r'\item')[1:]:
                 t = inline(item, md=False, omml=True)
                 if t:
-                    p = doc.add_paragraph(style='List Bullet')
-                    add_rich(p, t, size=10, font='Times New Roman')
+                    p = para('\u2022\t' + t, indent=-9)
+                    p.paragraph_format.left_indent = Pt(18)
+                    p.paragraph_format.tab_stops.add_tab_stop(Pt(18))
         elif kind == 'equation':
             for row, n in payload:
                 p = doc.add_paragraph()
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                p.paragraph_format.first_line_indent = Inches(0)
-                p.paragraph_format.space_before = Pt(4)
-                p.paragraph_format.space_after = Pt(4)
+                pf = p.paragraph_format
+                pf.first_line_indent = Pt(0)
+                pf.line_spacing = 1.0
+                pf.space_before = Pt(3)
+                pf.space_after = Pt(3)
                 tex = row + (rf' \qquad ({n})' if n else '')
                 pending.append((p._p, tex, 10, True))
         elif kind == 'table':
             num, src, wide = payload
-            cap, rows = parse_tabular(src, md=False, omml=True)
+            cap, rows = parse_tabular(src, md=False, omml=True, spans=True)
             ensure_columns(1 if wide else 2)
-            para(f'TABLE {num}.', size=8, align=WD_ALIGN_PARAGRAPH.CENTER,
-                 space_before=8)
-            para(cap.upper() if len(cap) < 90 else cap, size=8,
-                 align=WD_ALIGN_PARAGRAPH.CENTER, space_after=3)
+            p = para(f'Table {num}', size=8, small_caps=True,
+                     align=WD_ALIGN_PARAGRAPH.CENTER, space_before=6)
+            p.paragraph_format.keep_with_next = True
+            p = para(cap, size=8, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=3)
+            p.paragraph_format.keep_with_next = True
             if rows:
-                ncol = max(len(r) for r in rows)
+                ncol = max(sum(s for _, s in r) for r in rows)
+                widths = column_widths(rows, ncol, TEXT_W if wide else COL_W)
                 t = doc.add_table(rows=0, cols=ncol)
-                t.style = 'Table Grid'
                 t.alignment = WD_TABLE_ALIGNMENT.CENTER
+                t.autofit = False
+                for gc, w in zip(t._tbl.tblGrid.findall(qn('w:gridCol')), widths):
+                    gc.set(qn('w:w'), str(int(w * 20)))
+                # the header is every row before the first data row whose
+                # first cell is filled (group headers have an empty corner)
+                header_rows = 1
+                while (header_rows < len(rows) - 1
+                       and not rows[header_rows - 1][0][0]):
+                    header_rows += 1
                 for ri, row in enumerate(rows):
                     cells = t.add_row().cells
-                    for ci in range(ncol):
-                        txt = row[ci] if ci < len(row) else ''
-                        cp = cells[ci].paragraphs[0]
-                        cp.paragraph_format.first_line_indent = Inches(0)
-                        cp.alignment = (WD_ALIGN_PARAGRAPH.LEFT if ci == 0
+                    c = 0
+                    for txt, span in row:
+                        if c >= ncol:
+                            break
+                        cell = cells[c]
+                        if span > 1:
+                            cell = cell.merge(cells[min(c + span, ncol) - 1])
+                        elif len(row) == 1:                 # footnote row
+                            cell = cell.merge(cells[ncol - 1])
+                        cell.width = Pt(sum(widths[c:c + span]))
+                        cp = cell.paragraphs[0]
+                        cp.paragraph_format.first_line_indent = Pt(0)
+                        cp.paragraph_format.line_spacing = Pt(LEADING[8])
+                        cp.alignment = (WD_ALIGN_PARAGRAPH.LEFT
+                                        if c == 0 and span == 1 or len(row) == 1
                                         else WD_ALIGN_PARAGRAPH.CENTER)
-                        add_rich(cp, txt, size=8, bold=(ri == 0),
+                        add_rich(cp, txt, size=8, bold=(ri < header_rows),
                                  font='Times New Roman')
-                        if ri == 0:
-                            shade(cells[ci])
-                para('', size=6, space_after=6)
+                        c += span
+                booktabs(t, header_rows)
+                para('', size=4, space_after=4).paragraph_format.line_spacing = Pt(4)
             if wide:
                 ensure_columns(2)
         elif kind == 'figure':
@@ -692,7 +798,7 @@ def to_docx(blocks, path):
                     p.add_run().add_picture(
                         png, width=Inches(6.8 if wide else 3.2))
             para(f'Fig. {num}.  {cap}', size=8,
-                 align=WD_ALIGN_PARAGRAPH.CENTER, space_after=8)
+                 align=WD_ALIGN_PARAGRAPH.JUSTIFY, space_after=6)
             if wide:
                 ensure_columns(2)
         elif kind == 'algorithm':
@@ -704,17 +810,23 @@ def to_docx(blocks, path):
             for n, ln in enumerate(re.findall(
                     r'\\(?:STATE|REQUIRE|ENSURE|REPEAT|UNTIL|RETURN)\b(.*)', src), 1):
                 p = doc.add_paragraph()
-                p.paragraph_format.first_line_indent = Inches(0)
+                p.paragraph_format.first_line_indent = Pt(0)
+                p.paragraph_format.line_spacing = 1.0
                 add_rich(p, f'{n}:  {inline(ln, md=False, omml=True)}', size=9,
                          font='Consolas')
-            para('', size=6, space_after=6)
+            para('', size=4, space_after=4)
         elif kind == 'bib':
+            p = para('References', size=10, small_caps=True,
+                     align=WD_ALIGN_PARAGRAPH.CENTER, space_before=8,
+                     space_after=4)
+            p.paragraph_format.keep_with_next = True
             items = payload.split(r'\bibitem')[1:]
             for n, it in enumerate(items, 1):
                 txt = inline(it[it.index('}') + 1:], md=False)
-                p = para(f'[{n}] {txt}', size=8, space_after=2)
-                p.paragraph_format.left_indent = Inches(0.22)
-                p.paragraph_format.first_line_indent = Inches(-0.22)
+                p = para(f'[{n}]\t{txt}', size=8, space_after=1)
+                p.paragraph_format.left_indent = Pt(18)
+                p.paragraph_format.first_line_indent = Pt(-18)
+                p.paragraph_format.tab_stops.add_tab_stop(Pt(18))
 
     maths = latex_to_omml([tex for _, tex, _, _ in pending])
     for (el, _, size, display), om in zip(pending, maths):
