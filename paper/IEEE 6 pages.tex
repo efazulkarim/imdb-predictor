@@ -35,23 +35,16 @@ Screenplay-to-rating regression is usually reported on a random split of
 an archival corpus. We argue that this number is not the number a reader
 wants, and we measure the gap. Working from a corpus of $5{,}204$
 IMSDb screenplays joined to IMDb metadata, we first run a record-identity
-audit --- content SHA-256 digests, IMDb identifiers, title$\times$year
-keys, and a normalised title-family key --- and publish the resulting
-exclusion ledger, which retains $5{,}164$ records after removing nine
-sub-1\,KB fragments, four corrupt release years, and twenty-seven records
-whose positional identity in the archived embedding matrix cannot be
-resolved uniquely. We then quantify a defect that is invisible at the API
+audit and publish the resulting exclusion ledger, which retains
+$5{,}164$ records. We then quantify a defect that is invisible at the API
 surface: the pipeline slides a $256$-\emph{word} window over each script,
 but the encoder admits only $254$ WordPiece \emph{tokens}, so
 $98.45\%$ of windows are cut and $31.60\%$ of all tokens never reach the
 model. Finally we evaluate identical representations and learners under
 three partitions --- random $k$-fold, title-family \textsc{GroupKFold},
-and a chronological 2020--2025 holdout. Skill is strongly
-protocol-dependent: the best system reports $R^{2}=0.549$
-$[0.530, 0.567]$ under random folds, $0.536$ $[0.516, 0.554]$ once
-franchises are held together, and $0.309$ $[0.199, 0.404]$ when the test
-set lies in the future. Block-permutation analysis on the temporal
-holdout explains why. Release year and decade, which jointly supply
+and a chronological 2020--2025 holdout. The best system reports
+$R^{2}=0.549$ under random folds, $0.536$ once franchises are held
+together, and $0.309$ when the test set lies in the future. Release year and decade, which jointly supply
 $36.6\%$ of in-sample split gain, contribute exactly
 $\Delta\mathrm{MAE}=0.000$ once the test years fall outside the training
 range, while runtime alone ($+0.199$) matches the entire $384$-dimensional
@@ -69,10 +62,9 @@ cross-validation.
 \section{Introduction}
 
 A feature-film screenplay runs to roughly $25{,}000$ words. Sentence
-encoders read $256$ tokens. That mismatch is the central engineering
-problem in screenplay modelling, and the usual answer --- slide a window,
-embed each window, average the results --- is cheap, reproducible, and
-widely used. What is far less often examined is whether the evaluation
+encoders read $256$ tokens. The usual answer --- slide a window, embed
+each window, average the results --- is cheap and widely used. What is
+far less often examined is whether the evaluation
 wrapped around that pipeline measures anything a practitioner could rely
 on, because an archival screenplay corpus assembled from a community
 repository carries two structural hazards that a shuffled train/test
@@ -88,18 +80,12 @@ line of dialogue. That shortcut evaporates the moment the test films are
 drawn from years the model never saw, which is the only setting in which
 a screenplay-stage predictor would actually be deployed.
 
-Layered underneath both is a quieter defect specific to chunked
-long-document pipelines. Chunking is almost always specified in words;
-truncation always happens in subword tokens. Nobody is told when the
-budget is exceeded --- the encoder simply drops the tail --- so a
-configuration that reads as ``$256$-word windows with $50$-word overlap''
-can in practice discard a third of the corpus without emitting a single
-warning.
-
-This paper is an audit, not a leaderboard entry. We take an existing
-SBERT-plus-gradient-boosting pipeline over $5{,}204$ IMSDb screenplays and
-ask what its reported performance is actually made of. Three
-contributions follow.
+Layered underneath both is a quieter defect: chunking is almost always
+specified in words; truncation always happens in subword tokens, and
+nobody is told when the budget is exceeded. This paper is an audit, not a
+leaderboard entry. We take an existing SBERT-plus-gradient-boosting
+pipeline and ask what its reported performance is actually made of.
+Three contributions follow.
 
 \begin{itemize}
 \item \hlt{C1 --- A record-identity protocol and its exclusion ledger.}
@@ -199,9 +185,8 @@ design. We normalise a title $t$ by case-folding, stripping
 non-alphanumeric characters, removing a leading article, and iteratively
 deleting a trailing sequel marker --- an Arabic numeral, a Roman numeral
 up to $\mathrm{X}$, or a \texttt{part}~$n$ construction --- to a fixed
-point. \emph{Toy Story}, \emph{Toy Story 2} and \emph{Toy Story 3}
-therefore map to the single family \texttt{toy story}. Families are not
-deduplicated; they are the grouping variable for
+point. \emph{Toy Story} and \emph{Toy Story 2} therefore map to the single
+family \texttt{toy story}, the grouping variable for
 Section~\ref{sec:splits}.
 
 \subsection{The exclusion flow}
@@ -231,15 +216,12 @@ realised cardinality chain on this corpus is
 \;\xrightarrow{\ \pi_{\text{id}}\ } 5{,}164 .
 \end{equation}
 
-The second arrow is the one to read carefully. It is an identity map
-\emph{on the subset over which the digest could be evaluated}, not a
-corpus-wide null result: content hashing requires the raw text, and $356$
-of the $5{,}204$ files are distributed with the code. Over those $356$ the
-digest audit returns zero collisions. The metadata identity keys, which
-are computable for all $5{,}204$ records, likewise return zero duplicate
-IMDb identifiers and zero duplicate title$\times$year pairs, which bounds
---- without eliminating --- the residual duplication that a full-corpus
-pass could still uncover.
+The second arrow is an identity map \emph{on the subset over which the
+digest could be evaluated}, not a corpus-wide null result: content
+hashing requires the raw text, and $356$ of the $5{,}204$ files are
+distributed with the code. The metadata keys, computable for all records,
+bound --- without eliminating --- the residual duplication that a
+full-corpus pass could still uncover.
 
 \subsection{Audit results}
 
@@ -276,29 +258,19 @@ means the leakage channel in this corpus is not naive record
 duplication. Eighty titles appear more than once, spanning $165$ records,
 but every collision pairs distinct identifiers and distinct years ---
 these are remakes and same-title unrelated films, not duplicates. We
-retain them and place them in a shared family, because a remake shares
-premise, character names, and often substantial dialogue with its
-predecessor.
+retain them in a shared family. Four records carry release years of
+$1080$ or $1088$, transparently mis-typed $1980$ and $1988$; we drop them
+rather than silently repair them. The derived decade column is worse: the
+shipped label encoder holds $14$ decade strings, among them
+\texttt{1080s} and \texttt{1996s}, encoded as an \emph{ordinal} integer.
 
-\emph{Metadata corruption is present and reaches the model.} Four records
-carry release years of $1080$ or $1088$, transparently mis-typed $1980$
-and $1988$. We drop them rather than silently repair them. The derived
-decade column is worse: the label encoder fitted by the shipped pipeline
-holds $14$ distinct decade strings, among them \texttt{1080s},
-\texttt{1900s} and \texttt{1996s}, and it encodes them as an
-\emph{ordinal} integer.
-
-Twenty-seven further records are excluded for a reproducibility reason
-rather than a data-quality one. The archived embedding matrix stores rows
-in loader order without a record key, and the loader had already dropped
-nine sub-1\,KB scripts, so row $i$ of the matrix is not record $i$ of the
-spreadsheet. We reconstruct the offset function from the committed split
-bookkeeping --- $780$ test records anchor it exactly through their file
-names, $779$ validation records constrain it further through
-title-and-rating agreement --- and recover a mapping consistent with all
-$1{,}559$ anchors. Twenty-seven positions inside the reconstruction gaps
-admit more than one consistent assignment; we drop them rather than
-guess.
+Twenty-seven further records are excluded for a reproducibility reason.
+The archived embedding matrix stores rows in loader order without a
+record key, so row $i$ of the matrix is not record $i$ of the
+spreadsheet. We reconstruct the offset function from $1{,}559$ anchors in
+the committed split bookkeeping; twenty-seven positions inside the
+reconstruction gaps admit more than one consistent assignment, and we
+drop them rather than guess.
 
 % =====================================================================
 \section{Methodology and Representations}
@@ -370,20 +342,11 @@ discarded fraction for a document is
 
 Running the encoder's own tokeniser over the pipeline's own windows on
 the $356$ available scripts yields $14{,}558$ windows with median length
-$371$ tokens, $90$th percentile $405$, and maximum $613$
-(Fig.~\ref{fig:tokens}). The consequences: $98.45\%$ of windows exceed
-$B$, and $\rho$ evaluated corpus-wide is $0.3160$, with a worst case of
-$0.4443$. Roughly one word in three is written to a window that the
-encoder never reads. Nothing in the pipeline reports this.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{figures/12_token_budget.pdf}
-\caption{Window length in WordPiece tokens against the $254$-token
-content budget, over $14{,}558$ windows from $356$ screenplays. The
-window is specified in words; truncation happens in tokens.}
-\label{fig:tokens}
-\end{figure}
+$371$ tokens, $90$th percentile $405$, and maximum $613$. The
+consequences: $98.45\%$ of windows exceed $B$, and $\rho$ evaluated
+corpus-wide is $0.3160$, with a worst case of $0.4443$. Roughly one word
+in three is written to a window that the encoder never reads. Nothing in
+the pipeline reports this.
 
 \subsection{Lexical control and learners}
 
@@ -429,13 +392,10 @@ so no family is split across the boundary. Because $4{,}979$ families
 cover $5{,}164$ records, the constraint is nearly free: realised fold
 sizes are $1{,}032$--$1{,}033$, identical to P1.
 
-\hlt{P3, chronological.} With $\mathrm{yr}(i)$ the release year,
-\begin{align}
-\mathcal{T}_{\text{test}} &= \{\, i : 2020 \le \mathrm{yr}(i) \le 2025 \,\},\\
-\mathcal{T}_{\text{val}}  &= \{\, i : c \le \mathrm{yr}(i) \le 2019 \,\},\\
-\mathcal{T}_{\text{train}}&= \{\, i : \mathrm{yr}(i) < c \,\},
-\end{align}
-where $c$ is the $85$th percentile of the pre-2020 year distribution,
+\hlt{P3, chronological.} With $\mathrm{yr}(i)$ the release year, the
+test set is $2020 \le \mathrm{yr}(i) \le 2025$, validation
+$c \le \mathrm{yr}(i) \le 2019$, and training $\mathrm{yr}(i) < c$, where
+$c$ is the $85$th percentile of the pre-2020 year distribution,
 here $c = 2016$. Early stopping is thereby decided on films that are
 themselves in the future relative to the training set, so no
 forward-looking information enters through model selection. The realised
@@ -616,44 +576,20 @@ when the test films are genuinely unseen.
 
 The lexical control and the structural-feature model can be evaluated
 only under the random protocol on this corpus, because reconstructing
-either representation requires the raw script text.
-Table~\ref{tab:legacy} reproduces those figures from the archived runs.
-
-\begin{table}[t]
-\caption{Random-protocol results for the arms that require raw text
-($5$-fold CV, mean $\pm$ s.d.; archived runs over $5{,}195$ records).
-These are \emph{not} comparable to Tables~\ref{tab:grouped}--\ref{tab:temporal}.}
-\label{tab:legacy}
-\centering
-\small
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{lccc}
-\toprule
-\textbf{System} & RMSE & MAE & $R^{2}$ \\
-\midrule
-Structural OLS (16 + meta)   & $1.076 \pm 0.040$ & $0.833 \pm 0.031$ & $0.440 \pm 0.007$ \\
-TF-IDF + XGBoost             & $1.083 \pm 0.034$ & $0.819 \pm 0.022$ & $0.433 \pm 0.014$ \\
-SBERT + XGB (weighted)       & $1.000 \pm 0.027$ & $0.768 \pm 0.024$ & $0.516 \pm 0.026$ \\
-SBERT + XGB (unweighted)     & $0.958 \pm 0.033$ & $0.720 \pm 0.027$ & $0.556 \pm 0.009$ \\
-Ridge stack, 4 bases         & $0.935 \pm 0.032$ & $0.706 \pm 0.028$ & $0.577 \pm 0.010$ \\
-SBERT + XGB, TPE$^{\dagger}$ & $0.966$ & $0.714$ & $0.581$ \\
-\addlinespace[2pt]
-\multicolumn{4}{l}{\footnotesize $^{\dagger}$$100$ trials; single $80/20$ split with
-bootstrap intervals, not $5$-fold CV.}\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The lexical and structural arms land within $0.007$ $R^{2}$ of each other
---- $8{,}000$ TF-IDF weights buy almost exactly what sixteen hand-counted
-statistics buy. The semantic arm beats the lexical one by
+either representation requires the raw script text; the figures below
+are from archived $5$-fold runs over $5{,}195$ records and are \emph{not}
+comparable to Tables~\ref{tab:grouped}--\ref{tab:temporal}. Structural
+OLS reaches $R^{2} = 0.440 \pm 0.007$ and TF-IDF+XGBoost
+$0.433 \pm 0.014$ --- $8{,}000$ TF-IDF weights buy almost exactly what
+sixteen hand-counted statistics buy. The semantic arm beats the lexical one by
 $\Delta\mathrm{MAE} = 0.0514$ $[0.034, 0.067]$, $p = 2.6\times10^{-5}$, a
 real but modest margin. Inverse-frequency sample weighting, applied in
 the original pipeline to compensate for the rating imbalance,
 \emph{hurts}: removing it improves MAE by $0.0482$ $[0.039, 0.057]$ at
-$p = 2.5\times10^{-26}$. The nested ridge stack improves on its own
-strongest base by $\Delta\mathrm{MAE} = 0.0134$ $[0.008, 0.019]$,
-$p = 4.2\times10^{-6}$, and a $100$-trial TPE search over the boosting
+$p = 2.5\times10^{-26}$. The nested ridge stack ($R^{2} = 0.577 \pm
+0.010$) improves on its own strongest base by $\Delta\mathrm{MAE} =
+0.0134$ $[0.008, 0.019]$, $p = 4.2\times10^{-6}$, and a $100$-trial TPE
+search on a single $80/20$ split over the boosting
 head reaches test $R^{2} = 0.5811$ $[0.5471, 0.6182]$. Both gains are real
 and both are small next to the $0.240$ $R^{2}$ that separates the random
 and chronological protocols. Ensembling and tuning move the third
@@ -667,9 +603,8 @@ $6.0119$ to $5.7546$. Part of the $R^{2}$ collapse is therefore
 arithmetic --- the same absolute error against a narrower target yields a
 smaller $R^{2}$ --- and part is genuine degradation. Mean absolute error
 separates them: it is $0.7276$ under P1 and $0.7232$ under P3,
-statistically indistinguishable. The model's typical error in rating
-points does not grow at all when it predicts the future. What collapses
-is how much of the (now narrower) variance it can order. Regressing
+statistically indistinguishable. What collapses is how much of the (now
+narrower) variance it can order. Regressing
 prediction on truth over the holdout gives slope $0.4634$
 $(\mathrm{s.e.}\ 0.0278)$ and intercept $3.1745$, against an ideal slope
 of $1$. The system is heavily shrunk toward the centre --- it identifies
@@ -688,11 +623,7 @@ structural statistics take $8.0\%$. Per dimension the picture inverts:
 the single largest embedding dimension contributes $1.68\%$ and the mean
 dimension $0.14\%$, whereas \texttt{movie\_length} alone contributes
 $25.50\%$ and \texttt{year} $11.01\%$. One tabular column outweighs all
-sixteen structural statistics by a factor of three. Within the structural
-block the ordering is almost purely a size ordering: character, word,
-line, and sentence count occupy the top four positions, while the
-degenerate \texttt{dialogue\_density} and \texttt{unique\_characters}
-sit near the bottom; the model correctly declines to use them.
+sixteen structural statistics by a factor of three.
 
 \subsection{Block permutation on the temporal holdout}
 
@@ -720,48 +651,24 @@ carrying $11\%$ of in-sample gain becomes a constant at deployment.
 Runtime is the opposite case. It transfers cleanly, because a
 $130$-minute film in 2023 occupies the same region of feature space as a
 $130$-minute film in 1994, and it alone reproduces the predictive value
-of the entire semantic block. The embedding block carries real signal,
-but its per-dimension gain is flat --- no dimension exceeds $1.7\%$ ---
-and Eq.~\eqref{eq:norm} explains it: averaging $36$ median unit-norm
-window embeddings drives the document vector toward the centroid of the
-corpus, damping precisely the localised evidence a human reader would use
-to judge a script. Combined with the $31.6\%$ of tokens that truncation
-removes before pooling begins, that it still contributes as much as it
-does is the more surprising half of the result.
+of the entire semantic block. That the embedding block contributes as
+much as it does, after $31.6\%$ truncation and the smoothing of
+Eq.~\eqref{eq:norm}, is the more surprising half of the result.
 
 % =====================================================================
 \section{Threats to Validity and Limitations}
 \label{sec:limits}
 
-\hlt{Two arms are missing from the strict protocols.} TF-IDF and the
-sixteen structural statistics require raw text and could therefore be
-evaluated only under P1. Restoring the corpus makes the full three-way
-comparison a single re-run of the released scripts.
-
-\hlt{Selection effects in IMSDb are severe and not correctable.}
-Contributors upload what they value, so canonical and acclaimed films are
-over-represented among older titles. The corpus-wide mean rating falls
-monotonically from $7.87$ in the 1920s to $5.48$ in the 2010s, which is a
-statement about who uploads what, not about film quality. Any model
-reading \texttt{year} learns this curation artifact, and P3 is the
-protocol that refuses to reward it.
-
-\hlt{The holdout is one window.} A single 2020--2025 test period of $515$
-films cannot separate a general temporal-decay law from the particulars of
-those six years. Rolling-origin evaluation over several cut years would
-estimate the decay rate; we report one cut.
-
-\hlt{The strongest transferring feature is unavailable at deployment.}
-A screenplay-stage predictor does not know the runtime, because the film
-has not been cut --- or shot. Page count is a legitimate pre-production
-proxy for runtime and is recoverable from the script; we did not evaluate
-it.
-
-\hlt{Single encoder, single pooling.} We audit mean-pooled
-\texttt{all-MiniLM-L6-v2}. Larger encoders, learned pooling, and
-token-aligned windows are all plausible improvements, and none is
-evaluated here; holding the representation fixed is what makes the
-protocol comparison clean.
+TF-IDF and the structural statistics require raw text and were evaluated
+only under P1. Selection effects in IMSDb are severe and not correctable:
+the mean rating falls monotonically from $7.87$ in the 1920s to $5.48$ in
+the 2010s, which is a statement about who uploads what, not about film
+quality, and P3 is the protocol that refuses to reward it. The holdout is
+one window; rolling-origin evaluation would estimate the decay rate. A
+screenplay-stage predictor does not know the runtime, because the film
+has not been cut --- or shot. Finally, we audit only mean-pooled
+\texttt{all-MiniLM-L6-v2}; holding the representation fixed is what makes
+the protocol comparison clean.
 
 % =====================================================================
 \section{Conclusion}
@@ -785,12 +692,9 @@ key beside every cached representation.
 % =====================================================================
 \section*{Reproducibility}
 
-The audit, alignment-recovery, evaluation, and figure code are released
-with the paper (\texttt{audit\_corpus.py}, \texttt{recover\_alignment.py},
-\texttt{audit\_tokens.py}, \texttt{leakage\_eval.py},
-\texttt{analysis\_xai.py}, \texttt{make\_paper\_figures.py}). Every
-number is regenerated from the committed JSON artifacts in
-\texttt{results/}. The random seed is $42$ throughout.
+All audit and evaluation code is released with the paper; every number is
+regenerated from the committed JSON artifacts. The random seed is $42$
+throughout.
 
 % =====================================================================
 \begin{thebibliography}{99}
