@@ -2,7 +2,7 @@
 
 **Anonymous authors**
 
-***Abstract**—Screenplay-to-rating regression is usually reported on a random split of an archival corpus. We argue that this number is not the number a reader wants, and we measure the gap. Working from a corpus of 5,204 IMSDb screenplays joined to IMDb metadata, we first run a record-identity audit and publish the resulting exclusion ledger, which retains 5,164 records. We then quantify a defect that is invisible at the API surface: the pipeline slides a 256-*word* window over each script, but the encoder admits only 254 WordPiece *tokens*, so 98.45% of windows are cut and 31.60% of all tokens never reach the model. Finally we evaluate identical representations and learners under three partitions — random k-fold, title-family GroupKFold, and a chronological 2020–2025 holdout. The best system reports R^2=0.549 under random folds, 0.536 once franchises are held together, and 0.309 when the test set lies in the future. Release year and decade, which jointly supply 36.6% of in-sample split gain, contribute exactly DeltaMAE=0.000 once the test years fall outside the training range, while runtime alone (+0.199) matches the entire 384-dimensional sentence-embedding block (+0.195). Semantic embeddings survive the strict split; the calendar confound does not.*
+***Abstract**—Screenplay-to-rating regression is usually reported on a random split of an archival corpus. We argue that this number is not the number a reader wants, and we measure the gap. Working from a corpus of 5,204 IMSDb screenplays joined to IMDb metadata, we first run a record-identity audit and publish the resulting exclusion ledger, which retains 5,164 records. We then quantify a defect that is invisible at the API surface: the pipeline slides a 256-*word* window over each script, but the encoder admits only 254 WordPiece *tokens*, so 98.45% of windows are cut and 31.60% of all tokens never reach the model. Finally we evaluate identical representations and learners under three partitions — random $k$-fold, title-family GroupKFold, and a chronological 2020–2025 holdout. The best system reports $R^{2}=0.549$ under random folds, 0.536 once franchises are held together, and 0.309 when the test set lies in the future. Release year and decade, which jointly supply 36.6% of in-sample split gain, contribute exactly $\Delta\mathrm{MAE}=0.000$ once the test years fall outside the training range, while runtime alone (+0.199) matches the entire 384-dimensional sentence-embedding block (+0.195). Semantic embeddings survive the strict split; the calendar confound does not.*
 
 ***Index Terms**—data leakage, evaluation protocol, sentence embeddings, long-document NLP, screenplay analysis, temporal generalisation, grouped cross-validation.*
 
@@ -15,11 +15,11 @@ The first hazard is duplication. Franchises share vocabulary and structure acros
 
 Layered underneath both is a quieter defect: chunking is almost always specified in words; truncation always happens in subword tokens, and nobody is told when the budget is exceeded. This paper is an audit, not a leaderboard entry. We take an existing SBERT-plus-gradient-boosting pipeline and ask what its reported performance is actually made of. Three contributions follow.
 
-- **C1 — A record-identity protocol and its exclusion ledger.** We define film identity through four keys — content SHA-256 digest, IMDb identifier, title×year, and a normalised title-family stem — audit all 5,204 joined records against each, and report every exclusion (Section III).
+- **C1 — A record-identity protocol and its exclusion ledger.** We define film identity through four keys — content SHA-256 digest, IMDb identifier, title$\times$year, and a normalised title-family stem — audit all 5,204 joined records against each, and report every exclusion (Section III).
 - **C2 — A measurement of silent truncation.** Running the encoder's own tokeniser over the pipeline's own windows, we find that 98.45% of 256-word windows exceed the 254-token content budget and that 31.60% of WordPiece tokens are discarded before the encoder sees them (Section IV-B).
-- **C3 — A three-protocol evaluation with paired inference.** Holding representation and learner fixed, we vary only the partition: random k-fold, title-family GroupKFold, and a chronological 2020–2025 holdout. We report bootstrap intervals, paired Wilcoxon signed-rank tests with matched-pairs effect sizes, and a block-permutation attribution that isolates which feature families survive temporal extrapolation (Sections V and VI).
+- **C3 — A three-protocol evaluation with paired inference.** Holding representation and learner fixed, we vary only the partition: random $k$-fold, title-family GroupKFold, and a chronological 2020–2025 holdout. We report bootstrap intervals, paired Wilcoxon signed-rank tests with matched-pairs effect sizes, and a block-permutation attribution that isolates which feature families survive temporal extrapolation (Sections V and VI).
 
-We do not claim a new state of the art. We claim that the difference between R^2=0.549 and R^2=0.309 on the same corpus, the same features, and the same learner is the finding.
+We do not claim a new state of the art. We claim that the difference between $R^{2}=0.549$ and $R^{2}=0.309$ on the same corpus, the same features, and the same learner is the finding.
 
 
 ## II. Related Work
@@ -38,18 +38,34 @@ We do not claim a new state of the art. We claim that the difference between R^2
 
 The corpus joins full screenplay texts scraped from the Internet Movie Script Database (IMSDb) to IMDb metadata on a per-film basis. Each of the 5,204 joined records carries a title, release year, decade bin, IMDb identifier, runtime in minutes, an IMDb rating on the 1.0–10.0 scale at one-decimal resolution, and a path to the script file. Ratings have mean 5.98, median 5.80, and standard deviation 1.44.
 
-Deduplication is only as good as the notion of identity behind it, so we audit four keys of decreasing strictness. *Content digest:* for a script file with byte content b, the key is SHA256(b), which catches the re-upload-under-a-new-name case that no metadata key can see; collisions are resolved by retaining the earliest record in load order. *IMDb identifier:* the canonical film key. *Title×year:* a fallback for records whose identifier is missing or malformed. *Title family:* the loosest key, and the one that matters for split design. We normalise a title t by case-folding, stripping non-alphanumeric characters, removing a leading article, and iteratively deleting a trailing sequel marker — an Arabic numeral, a Roman numeral up to X, or a `part` n construction — to a fixed point. *Toy Story* and *Toy Story 2* therefore map to the single family `toy story`, the grouping variable for Section IV-D.
+Deduplication is only as good as the notion of identity behind it, so we audit four keys of decreasing strictness. *Content digest:* for a script file with byte content $b$, the key is $\mathrm{SHA256}(b)$, which catches the re-upload-under-a-new-name case that no metadata key can see; collisions are resolved by retaining the earliest record in load order. *IMDb identifier:* the canonical film key. *Title$\times$year:* a fallback for records whose identifier is missing or malformed. *Title family:* the loosest key, and the one that matters for split design. We normalise a title $t$ by case-folding, stripping non-alphanumeric characters, removing a leading article, and iteratively deleting a trailing sequel marker — an Arabic numeral, a Roman numeral up to $\mathrm{X}$, or a `part` $n$ construction — to a fixed point. *Toy Story* and *Toy Story 2* therefore map to the single family `toy story`, the grouping variable for Section IV-D.
 
 
 ### B. The exclusion flow
 
-Let R_0 be the joined record set, |R_0| = 5,204. The pipeline is a composition of four filters applied in a fixed order, each defined by a predicate on a record r:
+Let $\mathcal{R}_0$ be the joined record set, $\vert \mathcal{R}_0\vert = 5{,}204$. The pipeline is a composition of four filters applied in a fixed order, each defined by a predicate on a record $r$:
 
-> pi_len(r) &= |text(r)| >= 1000 characters, ; pi_hash(r) &= SHA256\bigl(bytes(r)\bigr) not in H_<r, ; pi_year(r) &= yr(r) in [1900, 2025], ; pi_id(r) &= positional identity of r is unique,
+$$
+\pi_{\text{len}}(r) \equiv \vert \mathrm{text}(r)\vert \ge 1000 \ \text{characters}, \tag{1}
+$$
 
-where H_<r is the set of digests already seen in load order. The surviving sets are nested, R_k = \ r in R_k-1 : pi_k(r) \, and the realised cardinality chain on this corpus is
+$$
+\pi_{\text{hash}}(r) \equiv \mathrm{SHA256}\bigl(\mathrm{bytes}(r)\bigr) \notin \mathcal{H}_{<r}, \tag{2}
+$$
 
-> 5,204 \xrightarrow pi_len 5,195 \xrightarrow pi_hash 5,195 \xrightarrow pi_year 5,191 \xrightarrow pi_id 5,164 .
+$$
+\pi_{\text{year}}(r) \equiv \mathrm{yr}(r) \in [1900,\, 2025], \tag{3}
+$$
+
+$$
+\pi_{\text{id}}(r) \equiv \text{positional identity of } r \text{ is unique}, \tag{4}
+$$
+
+where $\mathcal{H}_{<r}$ is the set of digests already seen in load order. The surviving sets are nested, $\mathcal{R}_{k} = \{\, r \in \mathcal{R}_{k-1} : \pi_k(r) \,\}$, and the realised cardinality chain on this corpus is
+
+$$
+5{,}204 \;\xrightarrow{\ \pi_{\text{len}}\ } 5{,}195 \;\xrightarrow{\ \pi_{\text{hash}}\ } 5{,}195 \;\xrightarrow{\ \pi_{\text{year}}\ } 5{,}191 \;\xrightarrow{\ \pi_{\text{id}}\ } 5{,}164 . \tag{5}
+$$
 
 The second arrow is an identity map *on the subset over which the digest could be evaluated*, not a corpus-wide null result: content hashing requires the raw text, and 356 of the 5,204 files are distributed with the code. The metadata keys, computable for all records, bound — without eliminating — the residual duplication that a full-corpus pass could still uncover.
 
@@ -60,20 +76,20 @@ The second arrow is an identity map *on the subset over which the digest could b
 
 | **Check / exclusion** | **Count** | **%** |
 |---|---|---|
-| Joined records (IMSDb JOIN IMDb) | 5,204 | 100.00 |
+| Joined records (IMSDb $\bowtie$ IMDb) | 5,204 | 100.00 |
 | Distinct IMDb identifiers | 5,204 | 100.00 |
-| Duplicate title×year pairs | 0 | 0.00 |
+| Duplicate title$\times$year pairs | 0 | 0.00 |
 | Title collisions (same title, other year) | 80 / 165 rec. | 3.17 |
 | SHA-256 duplicate digests (audited subset) | 0 | — |
-| Script text <1,000 characters | 9 | 0.17 |
+| Script text $<1{,}000$ characters | 9 | 0.17 |
 | Release year outside [1900, 2025] | 4 | 0.08 |
 | Unresolvable positional identity | 27 | 0.52 |
 | **Analysis corpus** | 5,164 | **99.23** |
 | Title families / multi-member | 4,979 / 164 | — |
 
-Table I is the full ledger for the flow of Section III-B. All 5,204 identifiers are distinct and no title×year pair repeats. This is a genuinely clean join, and it means the leakage channel in this corpus is not naive record duplication. Eighty titles appear more than once, spanning 165 records, but every collision pairs distinct identifiers and distinct years — these are remakes and same-title unrelated films, not duplicates. We retain them in a shared family. Four records carry release years of 1080 or 1088, transparently mis-typed 1980 and 1988; we drop them rather than silently repair them. The derived decade column is worse: the shipped label encoder holds 14 decade strings, among them `1080s` and `1996s`, encoded as an *ordinal* integer.
+Table I is the full ledger for the flow of Section III-B. All 5,204 identifiers are distinct and no title$\times$year pair repeats. This is a genuinely clean join, and it means the leakage channel in this corpus is not naive record duplication. Eighty titles appear more than once, spanning 165 records, but every collision pairs distinct identifiers and distinct years — these are remakes and same-title unrelated films, not duplicates. We retain them in a shared family. Four records carry release years of 1080 or 1088, transparently mis-typed 1980 and 1988; we drop them rather than silently repair them. The derived decade column is worse: the shipped label encoder holds 14 decade strings, among them `1080s` and `1996s`, encoded as an *ordinal* integer.
 
-Twenty-seven further records are excluded for a reproducibility reason. The archived embedding matrix stores rows in loader order without a record key, so row i of the matrix is not record i of the spreadsheet. We reconstruct the offset function from 1,559 anchors in the committed split bookkeeping; twenty-seven positions inside the reconstruction gaps admit more than one consistent assignment, and we drop them rather than guess.
+Twenty-seven further records are excluded for a reproducibility reason. The archived embedding matrix stores rows in loader order without a record key, so row $i$ of the matrix is not record $i$ of the spreadsheet. We reconstruct the offset function from 1,559 anchors in the committed split bookkeeping; twenty-seven positions inside the reconstruction gaps admit more than one consistent assignment, and we drop them rather than guess.
 
 
 ## IV. Methodology and Representations
@@ -86,66 +102,82 @@ Sixteen statistics are computed from the raw, uncleaned script text: six size me
 
 ### B. Token-aligned chunking and mean pooling
 
-Let a screenplay be a word sequence D = (w_1, ..., w_N) obtained by whitespace splitting after light normalisation that removes bracketed stage directions, ALL-CAPS speaker cues, `INT.`/`EXT.` markers, and timestamps. With window length L = 256 and overlap o = 50, the stride is s = L - o = 206, and the j-th window is
+Let a screenplay be a word sequence $D = (w_1, \dots, w_N)$ obtained by whitespace splitting after light normalisation that removes bracketed stage directions, ALL-CAPS speaker cues, `INT.`/`EXT.` markers, and timestamps. With window length $L = 256$ and overlap $o = 50$, the stride is $s = L - o = 206$, and the $j$-th window is
 
-> C_j = \bigl(w_(j-1)s+1, ..., w_\min\(j-1)s+L, N ; bigr),
+$$
+C_j \;=\; \bigl(w_{(j-1)s+1}, \dots, w_{\min\{(j-1)s+L,\; N\}}\bigr), \tag{6}
+$$
 
-for j = 1, ..., M with M = 1 if N <= L and M = (N - L)/s + 1 otherwise. Each window is encoded by f: C -> ^d with d = 384, and the document representation is the arithmetic mean
+for $j = 1, \dots, M$ with $M = 1$ if $N \le L$ and $M = \lceil (N - L)/s \rceil + 1$ otherwise. Each window is encoded by $f: \mathcal{C} \to \mathbb{R}^{d}$ with $d = 384$, and the document representation is the arithmetic mean
 
-> e(D) = (1)/(M) \sum_j=1^M f(C_j) .
+$$
+e(D) \;=\; \frac{1}{M} \sum_{j=1}^{M} f(C_j) . \tag{7}
+$$
 
-Because the encoder L2-normalises its output, every f(C_j) lies on the unit sphere, so
+Because the encoder L2-normalises its output, every $f(C_j)$ lies on the unit sphere, so
 
-> \bigl\| e(D) \bigr\|_2^2 = \frac1M^2\Bigl( M + 2\sum_1 <= i < j <= M \langle f(C_i), f(C_j)\rangle \Bigr),
+$$
+\bigl\Vert e(D) \bigr\Vert _2^2 = \frac{1}{M^2}\Bigl( M + 2\!\!\sum_{1 \le i < j \le M}\!\! \langle f(C_i), f(C_j)\rangle \Bigr), \tag{8}
+$$
 
-which equals 1 only when all windows embed identically and falls toward 1/ as they decorrelate. With a median of 36 windows per script, no scene survives pooling as a distinguishable signal.
+which equals 1 only when all windows embed identically and falls toward $1/\sqrt{M}$ as they decorrelate. With a median of 36 windows per script, no scene survives pooling as a distinguishable signal.
 
-**The word/token mismatch.** The encoder's transformer accepts T_ = 256 positions, two of which are consumed by `[CLS]` and `[SEP]`. The content budget is therefore B = T_ - 2 = 254 WordPiece tokens, while C_j is defined by a count of 256 *words*. Writing tau(·) for the tokeniser, the encoder in fact sees tau(C_j) truncated to its first B entries, and the discarded fraction for a document is
+**The word/token mismatch.** The encoder's transformer accepts $T_{\max} = 256$ positions, two of which are consumed by `[CLS]` and `[SEP]`. The content budget is therefore $B = T_{\max} - 2 = 254$ WordPiece tokens, while $C_j$ is defined by a count of 256 *words*. Writing $\tau(\cdot)$ for the tokeniser, the encoder in fact sees $\tau(C_j)$ truncated to its first $B$ entries, and the discarded fraction for a document is
 
-> rho(D) = 1 - \frac\sum_j=1^M \min\bigl\|tau(C_j)|, B\bigr\ \sum_j=1^M |tau(C_j)| .
+$$
+\rho(D) \;=\; 1 - \frac{\sum_{j=1}^{M} \min\bigl\{\vert \tau(C_j)\vert ,\, B\bigr\}} {\sum_{j=1}^{M} \vert \tau(C_j)\vert } . \tag{9}
+$$
 
-Running the encoder's own tokeniser over the pipeline's own windows on the 356 available scripts yields 14,558 windows with median length 371 tokens, 90th percentile 405, and maximum 613. The consequences: 98.45% of windows exceed B, and rho evaluated corpus-wide is 0.3160, with a worst case of 0.4443. Roughly one word in three is written to a window that the encoder never reads. Nothing in the pipeline reports this.
+Running the encoder's own tokeniser over the pipeline's own windows on the 356 available scripts yields 14,558 windows with median length 371 tokens, 90th percentile 405, and maximum 613. The consequences: 98.45% of windows exceed $B$, and $\rho$ evaluated corpus-wide is 0.3160, with a worst case of 0.4443. Roughly one word in three is written to a window that the encoder never reads. Nothing in the pipeline reports this.
 
 
 ### C. Lexical control and learners
 
-The lexical control is TF-IDF over unigrams and bigrams, capped at 8,000 features, with English stop words removed, minimum document frequency 3, maximum document frequency 0.85, and sublinear term frequency 1 + tf. It is fed to the same gradient-boosted regressor as the semantic arm. This pairing is deliberate: SBERT and TF-IDF differ in representation and in nothing else, so their gap is attributable to semantics rather than to the learner.
+The lexical control is TF-IDF over unigrams and bigrams, capped at 8,000 features, with English stop words removed, minimum document frequency 3, maximum document frequency 0.85, and sublinear term frequency $1 + \log \mathrm{tf}$. It is fed to the same gradient-boosted regressor as the semantic arm. This pairing is deliberate: SBERT and TF-IDF differ in representation and in nothing else, so their gap is attributable to semantics rather than to the learner.
 
-The regressor throughout is gradient-boosted trees with 500 rounds, learning rate 0.05, maximum depth 6, histogram splitting, and early stopping after 20 rounds without validation improvement; predictions are clipped to [1, 10]. Two linear probes provide reference points: ordinary least squares on the three metadata columns, and ridge regression (alpha = 1.5) on standardised embeddings. A constant-mean predictor anchors the bottom. For the stacked ensemble, a ridge meta-regressor is fitted over four base models — metadata OLS, structural OLS, TF-IDF+XGBoost, SBERT+XGBoost — using inner five-fold out-of-fold meta-features nested within each outer fold.
+The regressor throughout is gradient-boosted trees with 500 rounds, learning rate 0.05, maximum depth 6, histogram splitting, and early stopping after 20 rounds without validation improvement; predictions are clipped to [1, 10]. Two linear probes provide reference points: ordinary least squares on the three metadata columns, and ridge regression ($\alpha = 1.5$) on standardised embeddings. A constant-mean predictor anchors the bottom. For the stacked ensemble, a ridge meta-regressor is fitted over four base models — metadata OLS, structural OLS, TF-IDF+XGBoost, SBERT+XGBoost — using inner five-fold out-of-fold meta-features nested within each outer fold.
 
 
 ### D. Partition protocols
 
-Let I = \1, ..., n\ index the analysis corpus, n = 5,164.
+Let $\mathcal{I} = \{1, \dots, n\}$ index the analysis corpus, $n = 5{,}164$.
 
-**P1, random.** A shuffled K-fold partition, K = 5: disjoint F_1, ..., F_K with \bigcup_k F_k = I, assignment independent of every record attribute.
+**P1, random.** A shuffled $K$-fold partition, $K = 5$: disjoint $F_1, \dots, F_K$ with $\bigcup_k F_k = \mathcal{I}$, assignment independent of every record attribute.
 
-**P2, grouped.** Let gamma: I -> G map each record to its title family, |G| = 4,979. GroupKFold constructs disjoint folds subject to the group constraint
+**P2, grouped.** Let $\gamma: \mathcal{I} \to \mathcal{G}$ map each record to its title family, $\vert \mathcal{G}\vert = 4{,}979$. GroupKFold constructs disjoint folds subject to the group constraint
 
-> for all g in G exists! k in \1,...,K\: gamma^-1(g) ⊆ F_k ,
+$$
+\forall g \in \mathcal{G}\;\; \exists!\, k \in \{1,\dots,K\}:\; \gamma^{-1}(g) \subseteq F_k , \tag{10}
+$$
 
 so no family is split across the boundary. Because 4,979 families cover 5,164 records, the constraint is nearly free: realised fold sizes are 1,032–1,033, identical to P1.
 
-**P3, chronological.** With yr(i) the release year, the test set is 2020 <= yr(i) <= 2025, validation c <= yr(i) <= 2019, and training yr(i) < c, where c is the 85th percentile of the pre-2020 year distribution, here c = 2016. Early stopping is thereby decided on films that are themselves in the future relative to the training set, so no forward-looking information enters through model selection. The realised sizes are 3,918 / 731 / 515.
+**P3, chronological.** With $\mathrm{yr}(i)$ the release year, the test set is $2020 \le \mathrm{yr}(i) \le 2025$, validation $c \le \mathrm{yr}(i) \le 2019$, and training $\mathrm{yr}(i) < c$, where $c$ is the 85th percentile of the pre-2020 year distribution, here $c = 2016$. Early stopping is thereby decided on films that are themselves in the future relative to the training set, so no forward-looking information enters through model selection. The realised sizes are 3,918 / 731 / 515.
 
 A partition's leakage can be measured directly. Define the family-overlap rate of a test fold as the share of its records whose family also occurs in the corresponding training pool,
 
-> lambda(F_k) = (1)/(|F_k|) \bigl|\ i in F_k : gamma(i) in gamma(I \setminus F_k) ; bigr| .
+$$
+\lambda(F_k) = \frac{1}{\vert F_k\vert } \bigl\vert \{\, i \in F_k : \gamma(i) \in \gamma(\mathcal{I} \setminus F_k) \,\}\bigr\vert . \tag{11}
+$$
 
-Averaged over folds, lambda = 5.50% under P1 and, by construction, lambda = 0 under P2. The chronological holdout sits at lambda = 6.41% — a sequel released in 2021 may well have a parent film in the training years.
+Averaged over folds, $\lambda = 5.50\%$ under P1 and, by construction, $\lambda = 0$ under P2. The chronological holdout sits at $\lambda = 6.41\%$ — a sequel released in 2021 may well have a parent film in the training years.
 
 
 ### E. Inference
 
-Point estimates carry percentile bootstrap intervals from B = 1000 resamples of the test set. Model comparison is paired and distribution-free. For predictions y^A, y^B on a common test set, form per-record absolute errors e^A_i = |y^A_i - y_i| and e^B_i likewise, take d_i = e^A_i - e^B_i, discard the n_0 exact ties, rank the remaining |d_i|, and accumulate
+Point estimates carry percentile bootstrap intervals from $B = 1000$ resamples of the test set. Model comparison is paired and distribution-free. For predictions $\hat{y}^{A}$, $\hat{y}^{B}$ on a common test set, form per-record absolute errors $e^{A}_i = \vert \hat{y}^{A}_i - y_i\vert$ and $e^{B}_i$ likewise, take $d_i = e^{A}_i - e^{B}_i$, discard the $n_0$ exact ties, rank the remaining $\vert d_i\vert$, and accumulate
 
-> R^+ = \sum_i: d_i > 0 rank(|d_i|), \qquad R^- = \sum_i: d_i < 0 rank(|d_i|) ,
+$$
+R^{+} = \!\!\sum_{i:\, d_i > 0}\!\! \mathrm{rank}(\vert d_i\vert ), \qquad R^{-} = \!\!\sum_{i:\, d_i < 0}\!\! \mathrm{rank}(\vert d_i\vert ) , \tag{12}
+$$
 
-with test statistic W = (R^+, R^-). The signed-rank test is non-parametric and has no degrees-of-freedom parameter; the reporting quantities are the number of pairs n, the number of non-tied pairs n - n_0, the statistic W, and the matched-pairs rank-biserial effect size
+with test statistic $W = \min(R^{+}, R^{-})$. The signed-rank test is non-parametric and has no degrees-of-freedom parameter; the reporting quantities are the number of pairs $n$, the number of non-tied pairs $n - n_0$, the statistic $W$, and the matched-pairs rank-biserial effect size
 
-> r = (R^+ - R^-)/(R^+ + R^-) in [-1, 1] ,
+$$
+r \;=\; \frac{R^{+} - R^{-}}{R^{+} + R^{-}} \;\in\; [-1, 1] , \tag{13}
+$$
 
-which we report alongside p so that a small effect at large n is not mistaken for a large one. Differences in mean absolute error carry their own paired bootstrap intervals.
+which we report alongside $p$ so that a small effect at large $n$ is not mistaken for a large one. Differences in mean absolute error carry their own paired bootstrap intervals.
 
 
 ## V. Experimental Results
@@ -155,67 +187,67 @@ which we report alongside p so that a small effect at large n is not mistaken fo
 
 Table II isolates the cost of the group constraint; Table III isolates the cost of the temporal one. Five systems, one corpus, one learner configuration throughout.
 
-**TABLE II.** Grouped five-fold results. P1 shuffles records; P2 enforces the title-family constraint (7). Pooled out-of-fold point estimates over 5,164 records. Delta R^2 is the explained variance lost to the constraint, i.e. the share of P1 skill that franchise overlap was supplying.
+**TABLE II.** Grouped five-fold results. P1 shuffles records; P2 enforces the title-family constraint (10). Pooled out-of-fold point estimates over 5,164 records. $\Delta R^{2}$ is the explained variance lost to the constraint, i.e. the share of P1 skill that franchise overlap was supplying.
 
-|  | **P1 random k-fold** (lambda = 5.50%) | **P2 grouped by family** (lambda = 0%) |  |  |  |  |  |
+|  | **P1 random $k$-fold** ($\lambda = 5.50\%$) | **P2 grouped by family** ($\lambda = 0\%$) |  |  |  |  |  |
 |---|---|---|---|---|---|---|---|
-| **System** | RMSE | MAE | R^2 | RMSE | MAE | R^2 | Delta R^2 |
+| **System** | RMSE | MAE | $R^{2}$ | RMSE | MAE | $R^{2}$ | $\Delta R^{2}$ |
 | Constant mean | 1.4373 | 1.1761 | -0.0000 | 1.4375 | 1.1765 | -0.0004 | -0.0004 |
 | Metadata OLS | 1.1237 | 0.8701 | 0.3888 | 1.1236 | 0.8695 | 0.3889 | +0.0001 |
 | SBERT ridge | 1.1122 | 0.8618 | 0.4012 | 1.1238 | 0.8742 | 0.3887 | -0.0125 |
 | SBERT + XGBoost | 1.0907 | 0.8355 | 0.4241 | 1.1026 | 0.8445 | 0.4114 | -0.0127 |
 | SBERT + meta + XGBoost | **0.9652** | **0.7276** | **0.5490** | **0.9791** | **0.7309** | **0.5359** | -0.0131 |
-| Best system: P1 R^2in[0.5298,0.5671], P2 R^2in[0.5162,0.5537]. Every arm that reads text loses R^2; the metadata-only probe does not. |  |  |  |  |  |  |  |
+| Best system: P1 $R^{2}\in[0.5298,0.5671]$, P2 $R^{2}\in[0.5162,0.5537]$. Every arm that reads text loses $R^{2}$; the metadata-only probe does not. |  |  |  |  |  |  |  |
 
 **TABLE III.** Temporal holdout. Fit on films released up to 2015, early stopping on 2016–2019, tested on the 515 films released 2020–2025.
 
-| **System** | RMSE | MAE | R^2 |
+| **System** | RMSE | MAE | $R^{2}$ |
 |---|---|---|---|
 | Constant mean | 1.2230 | 0.9762 | -0.0947 |
 | Metadata OLS | 1.0794 | 0.8384 | 0.1473 |
 | SBERT ridge | 1.0719 | 0.8417 | 0.1591 |
 | SBERT + XGBoost | 1.0007 | 0.7469 | 0.2671 |
 | SBERT + meta + XGBoost | **0.9717** | **0.7232** | **0.3089** |
-| Best system R^2in[0.1985,0.4038]; lambda = 6.41%. |  |  |  |
-| Target: train 6.0119 ± 1.4619, holdout 5.7546 ± 1.1701. |  |  |  |
+| Best system $R^{2}\in[0.1985,0.4038]$; $\lambda = 6.41\%$. |  |  |  |
+| Target: train $6.0119 \pm 1.4619$, holdout $5.7546 \pm 1.1701$. |  |  |  |
 
-Grouping costs little. The best system moves from R^2 = 0.5490 to 0.5359, a drop of 0.0131, and the two bootstrap intervals overlap substantially. That is the expected result for a corpus in which only 164 families have more than one member and the largest has four. The interesting part is that the effect is consistently negative across every system that reads text — SBERT ridge loses 0.0125 R^2, SBERT+XGBoost loses 0.0127 — while the metadata-only probe is unmoved (0.3888 -> 0.3889). Franchise leakage is a *textual* channel, and a metadata model cannot exploit it because it never sees the words.
+Grouping costs little. The best system moves from $R^{2} = 0.5490$ to 0.5359, a drop of 0.0131, and the two bootstrap intervals overlap substantially. That is the expected result for a corpus in which only 164 families have more than one member and the largest has four. The interesting part is that the effect is consistently negative across every system that reads text — SBERT ridge loses 0.0125 $R^{2}$, SBERT+XGBoost loses 0.0127 — while the metadata-only probe is unmoved ($0.3888 \to 0.3889$). Franchise leakage is a *textual* channel, and a metadata model cannot exploit it because it never sees the words.
 
-Chronology costs a great deal. The same best system falls to R^2 = 0.3089, and the interval [0.1985, 0.4038] no longer overlaps either in-corpus estimate. The constant-mean predictor goes from R^2 ≈ 0 to -0.0947, which is a pure distribution-shift effect: the training mean (6.11) is simply wrong for the holdout (5.75). And the metadata probe collapses hardest of all, from 0.3889 to 0.1473, losing 62% of its explanatory power, while the text-only SBERT model loses 35% (0.4114 -> 0.2671). The representation that generalises worst across time is the one that was never about the film.
+Chronology costs a great deal. The same best system falls to $R^{2} = 0.3089$, and the interval [0.1985, 0.4038] no longer overlaps either in-corpus estimate. The constant-mean predictor goes from $R^{2} \approx 0$ to -0.0947, which is a pure distribution-shift effect: the training mean (6.11) is simply wrong for the holdout (5.75). And the metadata probe collapses hardest of all, from 0.3889 to 0.1473, losing 62% of its explanatory power, while the text-only SBERT model loses 35% ($0.4114 \to 0.2671$). The representation that generalises worst across time is the one that was never about the film.
 
 
 ### B. Paired comparisons
 
 Table IV reports every baseline against the best system on matched records.
 
-**TABLE IV.** Paired comparison against SBERT + metadata + XGBoost. DeltaMAE is positive when the reference system has lower error. p from the two-sided Wilcoxon signed-rank test.
+**TABLE IV.** Paired comparison against SBERT + metadata + XGBoost. $\Delta\mathrm{MAE}$ is positive when the reference system has lower error. $p$ from the two-sided Wilcoxon signed-rank test.
 
-| **Prot.** | **Baseline** | DeltaMAE | **95% CI** | p |
+| **Prot.** | **Baseline** | $\Delta\mathrm{MAE}$ | **95% CI** | $p$ |
 |---|---|---|---|---|
-| P1 | Constant mean | +0.4485 | [+0.427, +0.471] | 2.2×10^-281 |
-|  | Metadata OLS | +0.1425 | [+0.129, +0.157] | 1.8×10^-73 |
-|  | SBERT ridge | +0.1342 | [+0.116, +0.150] | 7.0×10^-55 |
-|  | SBERT + XGB | +0.1079 | [+0.093, +0.122] | 4.7×10^-46 |
-| P2 | Constant mean | +0.4456 | [+0.424, +0.466] | 2.9×10^-280 |
-|  | Metadata OLS | +0.1386 | [+0.124, +0.152] | 2.8×10^-73 |
-|  | SBERT ridge | +0.1433 | [+0.127, +0.159] | 2.5×10^-61 |
-|  | SBERT + XGB | +0.1136 | [+0.100, +0.127] | 2.1×10^-50 |
-| P3 | Constant mean | +0.2530 | [+0.195, +0.313] | 5.7×10^-15 |
-|  | Metadata OLS | +0.1152 | [+0.063, +0.166] | 2.0×10^-4 |
-|  | SBERT ridge | +0.1185 | [+0.064, +0.176] | 1.3×10^-4 |
+| P1 | Constant mean | +0.4485 | [+0.427, +0.471] | $2.2\!\times\!10^{-281}$ |
+|  | Metadata OLS | +0.1425 | [+0.129, +0.157] | $1.8\!\times\!10^{-73}$ |
+|  | SBERT ridge | +0.1342 | [+0.116, +0.150] | $7.0\!\times\!10^{-55}$ |
+|  | SBERT + XGB | +0.1079 | [+0.093, +0.122] | $4.7\!\times\!10^{-46}$ |
+| P2 | Constant mean | +0.4456 | [+0.424, +0.466] | $2.9\!\times\!10^{-280}$ |
+|  | Metadata OLS | +0.1386 | [+0.124, +0.152] | $2.8\!\times\!10^{-73}$ |
+|  | SBERT ridge | +0.1433 | [+0.127, +0.159] | $2.5\!\times\!10^{-61}$ |
+|  | SBERT + XGB | +0.1136 | [+0.100, +0.127] | $2.1\!\times\!10^{-50}$ |
+| P3 | Constant mean | +0.2530 | [+0.195, +0.313] | $5.7\!\times\!10^{-15}$ |
+|  | Metadata OLS | +0.1152 | [+0.063, +0.166] | $2.0\!\times\!10^{-4}$ |
+|  | SBERT ridge | +0.1185 | [+0.064, +0.176] | $1.3\!\times\!10^{-4}$ |
 |  | SBERT + XGB | +0.0236 | [-0.020, +0.074] | 0.273 |
 
-The final row is the one that changes the story. Under P1 and P2, adding the three metadata columns to the embedding buys a highly significant 0.108–0.114 rating points of mean absolute error. Under P3 the same addition buys 0.0236 points, with an interval straddling zero and p = 0.273; the full statistics are W = 62,734 over n = 515 pairs with no ties, rank-biserial r = +0.056. An effect size of 0.056 is negligible by any convention. The metadata block, worth two orders of magnitude in p-value under a random split, is not measurably useful when the test films are genuinely unseen.
+The final row is the one that changes the story. Under P1 and P2, adding the three metadata columns to the embedding buys a highly significant 0.108–0.114 rating points of mean absolute error. Under P3 the same addition buys 0.0236 points, with an interval straddling zero and $p = 0.273$; the full statistics are $W = 62{,}734$ over $n = 515$ pairs with no ties, rank-biserial $r = +0.056$. An effect size of 0.056 is negligible by any convention. The metadata block, worth two orders of magnitude in $p$-value under a random split, is not measurably useful when the test films are genuinely unseen.
 
 
 ### C. The lexical and structural arms
 
-The lexical control and the structural-feature model can be evaluated only under the random protocol on this corpus, because reconstructing either representation requires the raw script text; the figures below are from archived 5-fold runs over 5,195 records and are *not* comparable to Tables II– III. Structural OLS reaches R^2 = 0.440 ± 0.007 and TF-IDF+XGBoost 0.433 ± 0.014 — 8,000 TF-IDF weights buy almost exactly what sixteen hand-counted statistics buy. The semantic arm beats the lexical one by DeltaMAE = 0.0514 [0.034, 0.067], p = 2.6×10^-5, a real but modest margin. Inverse-frequency sample weighting, applied in the original pipeline to compensate for the rating imbalance, *hurts*: removing it improves MAE by 0.0482 [0.039, 0.057] at p = 2.5×10^-26. The nested ridge stack (R^2 = 0.577 ± 0.010) improves on its own strongest base by DeltaMAE = 0.0134 [0.008, 0.019], p = 4.2×10^-6, and a 100-trial TPE search on a single 80/20 split over the boosting head reaches test R^2 = 0.5811 [0.5471, 0.6182]. Both gains are real and both are small next to the 0.240 R^2 that separates the random and chronological protocols. Ensembling and tuning move the third decimal; the split moves the first.
+The lexical control and the structural-feature model can be evaluated only under the random protocol on this corpus, because reconstructing either representation requires the raw script text; the figures below are from archived 5-fold runs over 5,195 records and are *not* comparable to Tables II– III. Structural OLS reaches $R^{2} = 0.440 \pm 0.007$ and TF-IDF+XGBoost $0.433 \pm 0.014$ — 8,000 TF-IDF weights buy almost exactly what sixteen hand-counted statistics buy. The semantic arm beats the lexical one by $\Delta\mathrm{MAE} = 0.0514$ [0.034, 0.067], $p = 2.6\times10^{-5}$, a real but modest margin. Inverse-frequency sample weighting, applied in the original pipeline to compensate for the rating imbalance, *hurts*: removing it improves MAE by 0.0482 [0.039, 0.057] at $p = 2.5\times10^{-26}$. The nested ridge stack ($R^{2} = 0.577 \pm 0.010$) improves on its own strongest base by $\Delta\mathrm{MAE} = 0.0134$ [0.008, 0.019], $p = 4.2\times10^{-6}$, and a 100-trial TPE search on a single 80/20 split over the boosting head reaches test $R^{2} = 0.5811$ [0.5471, 0.6182]. Both gains are real and both are small next to the 0.240 $R^{2}$ that separates the random and chronological protocols. Ensembling and tuning move the third decimal; the split moves the first.
 
 
 ### D. Temporal shift in detail
 
-The holdout target is compressed relative to the training pool: standard deviation falls from 1.4619 to 1.1701, while the mean falls from 6.0119 to 5.7546. Part of the R^2 collapse is therefore arithmetic — the same absolute error against a narrower target yields a smaller R^2 — and part is genuine degradation. Mean absolute error separates them: it is 0.7276 under P1 and 0.7232 under P3, statistically indistinguishable. What collapses is how much of the (now narrower) variance it can order. Regressing prediction on truth over the holdout gives slope 0.4634 (s.e. 0.0278) and intercept 3.1745, against an ideal slope of 1. The system is heavily shrunk toward the centre — it identifies which films are above or below average and declines to commit to how far.
+The holdout target is compressed relative to the training pool: standard deviation falls from 1.4619 to 1.1701, while the mean falls from 6.0119 to 5.7546. Part of the $R^{2}$ collapse is therefore arithmetic — the same absolute error against a narrower target yields a smaller $R^{2}$ — and part is genuine degradation. Mean absolute error separates them: it is 0.7276 under P1 and 0.7232 under P3, statistically indistinguishable. What collapses is how much of the (now narrower) variance it can order. Regressing prediction on truth over the holdout gives slope 0.4634 $(\mathrm{s.e.}\ 0.0278)$ and intercept 3.1745, against an ideal slope of 1. The system is heavily shrunk toward the centre — it identifies which films are above or below average and declines to commit to how far.
 
 
 ## VI. What the Features Are Doing
@@ -228,17 +260,17 @@ In the shipped model's total split gain, the 384 embedding dimensions take 55.5%
 
 ### B. Block permutation on the temporal holdout
 
-Gain is computed on training splits and therefore inherits every in-sample advantage. Permutation on the holdout does not. We shuffle each feature block across the 515 holdout films, re-predict, and record the increase in MAE over 20 repetitions; the baseline is MAE = 0.7232:
+Gain is computed on training splits and therefore inherits every in-sample advantage. Permutation on the holdout does not. We shuffle each feature block across the 515 holdout films, re-predict, and record the increase in MAE over 20 repetitions; the baseline is $\mathrm{MAE} = 0.7232$:
 
-- permuting all three metadata columns: +0.2168 ± 0.0250;
-- permuting `movie_length` alone: +0.1988 ± 0.0185;
-- permuting the entire 384-dimensional embedding: +0.1950 ± 0.0217;
-- permuting `year`: +0.0000 ± 0.0000;
-- permuting `decade_encoded`: +0.0000 ± 0.0000.
+- permuting all three metadata columns: $+0.2168 \pm 0.0250$;
+- permuting `movie_length` alone: $+0.1988 \pm 0.0185$;
+- permuting the entire 384-dimensional embedding: $+0.1950 \pm 0.0217$;
+- permuting `year`: $+0.0000 \pm 0.0000$;
+- permuting `decade_encoded`: $+0.0000 \pm 0.0000$.
 
 The two zeros are not rounding. Every holdout film was released in 2020–2025, and the model was fitted on films up to 2015, so every holdout value of `year` lies beyond the largest training split threshold. A tree ensemble routes all of them down the same branch; shuffling values that already share a leaf changes nothing. The feature carrying 11% of in-sample gain becomes a constant at deployment.
 
-Runtime is the opposite case. It transfers cleanly, because a 130-minute film in 2023 occupies the same region of feature space as a 130-minute film in 1994, and it alone reproduces the predictive value of the entire semantic block. That the embedding block contributes as much as it does, after 31.6% truncation and the smoothing of Eq. (5), is the more surprising half of the result.
+Runtime is the opposite case. It transfers cleanly, because a 130-minute film in 2023 occupies the same region of feature space as a 130-minute film in 1994, and it alone reproduces the predictive value of the entire semantic block. That the embedding block contributes as much as it does, after 31.6% truncation and the smoothing of Eq. (8), is the more surprising half of the result.
 
 
 ## VII. Threats to Validity and Limitations
@@ -248,7 +280,7 @@ TF-IDF and the structural statistics require raw text and were evaluated only un
 
 ## VIII. Conclusion
 
-We audited a screenplay-to-rating pipeline instead of extending it. The corpus turned out to be clean at the record level, but to carry 164 multi-member title families, four corrupt release years, and a corrupt ordinal decade vocabulary that reaches the feature matrix intact. The chunking configuration turned out to discard 31.60% of WordPiece tokens without warning. And the headline metric turned out to depend on the partition far more than on the model: R^2 = 0.549 under random folds, 0.536 once franchises are kept together, 0.309 when the test films are drawn from years the model never saw. Runtime transfers; semantics transfer; the calendar does not. For anyone building a screenplay-stage predictor, the operational recommendations are narrow and concrete: group by title family, hold out by release year, report MAE next to R^2 when the target distribution shifts, align the chunk to the tokeniser rather than to whitespace, and store an immutable record key beside every cached representation.
+We audited a screenplay-to-rating pipeline instead of extending it. The corpus turned out to be clean at the record level, but to carry 164 multi-member title families, four corrupt release years, and a corrupt ordinal decade vocabulary that reaches the feature matrix intact. The chunking configuration turned out to discard 31.60% of WordPiece tokens without warning. And the headline metric turned out to depend on the partition far more than on the model: $R^{2} = 0.549$ under random folds, 0.536 once franchises are kept together, 0.309 when the test films are drawn from years the model never saw. Runtime transfers; semantics transfer; the calendar does not. For anyone building a screenplay-stage predictor, the operational recommendations are narrow and concrete: group by title family, hold out by release year, report MAE next to $R^{2}$ when the target distribution shifts, align the chunk to the tokeniser rather than to whitespace, and store an immutable record key beside every cached representation.
 
 
 ##  Reproducibility
